@@ -1,0 +1,396 @@
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyCodeDto } from './dto/verify-code.dto';
+import * as nodemailer from 'nodemailer';
+import { User } from './entities/user.entity';
+import { Role } from './entities/role.entity';
+import { CreateStaffDto } from './dto/create-staff.dto';
+import { ReservationsService } from '../reservations/reservations.service';
+
+@Injectable()
+export class AuthService {
+  private readonly codeStore = new Map<string, { code: string; expiresAt: number }>();
+  private readonly logger = new Logger(AuthService.name);
+
+  constructor(
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    @InjectRepository(Role) private readonly roleRepository: Repository<Role>,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly reservationsService: ReservationsService,
+  ) {}
+
+  async register(dto: RegisterDto) {
+    const existing = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (existing) {
+      throw new BadRequestException('Email đã được đăng ký');
+    }
+
+    let role = await this.roleRepository.findOne({ where: { name: 'customer' } });
+    if (!role) {
+      role = this.roleRepository.create({ name: 'customer', description: 'Customer' });
+      role = await this.roleRepository.save(role);
+    }
+
+    const passwordHash = await this.hashPassword(dto.password);
+    const user = this.userRepository.create({
+      roleId: role.id,
+      fullName: dto.fullName,
+      email: dto.email,
+      phone: dto.phone,
+      passwordHash,
+      isActive: true,
+    });
+
+    const saved = await this.userRepository.save(user);
+    const payload = { sub: saved.id, email: saved.email, role: role.name };
+    return {
+      user: { id: saved.id, email: saved.email, fullName: saved.fullName },
+      accessToken: this.jwtService.sign(payload),
+    };
+  }
+
+  async login(dto: LoginDto) {
+    const user = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (!user) {
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
+    }
+
+    const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!isMatch) {
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
+    }
+
+    if (!user.isActive) {
+      throw new ForbiddenException('Tài khoản của bạn đã bị ngưng hoạt động. Vui lòng liên hệ nhà hàng để được hỗ trợ.');
+    }
+
+    const payload = { sub: user.id, email: user.email, role: user.role?.name || 'customer' };
+    return {
+      user: { id: user.id, email: user.email, fullName: user.fullName },
+      accessToken: this.jwtService.sign(payload),
+    };
+  }
+
+  // Đăng nhập trang quản trị — chỉ role admin hoặc staff được vào.
+  // Không có đăng ký, không có xác thực email cho tài khoản quản trị.
+  async adminLogin(dto: LoginDto) {
+    const user = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (!user) {
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
+    }
+
+    const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!isMatch) {
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
+    }
+
+    const roleName = user.role?.name;
+    if (roleName !== 'admin' && roleName !== 'staff') {
+      throw new ForbiddenException('Tài khoản của bạn không có quyền truy cập trang quản trị');
+    }
+
+    if (!user.isActive) {
+      throw new ForbiddenException('Tài khoản đã bị khoá');
+    }
+
+    const payload = { sub: user.id, email: user.email, role: roleName };
+    return {
+      user: { id: user.id, email: user.email, fullName: user.fullName, role: roleName },
+      accessToken: this.jwtService.sign(payload),
+    };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (!user) {
+      return { message: 'Nếu địa chỉ email tồn tại, mã đặt lại đã được gửi.' };
+    }
+
+    const code = this.generateSixDigitCode();
+    this.codeStore.set(dto.email, { code, expiresAt: Date.now() + 10 * 60 * 1000 });
+
+    try {
+      await this.sendMail(dto.email, code);
+      return {
+        message: 'Mã đặt lại đã được gửi đến email.',
+        ...(this.isDevelopment() ? { code } : {}),
+      };
+    } catch (error) {
+      console.warn('Việc gửi thư đã thất bại, mã đặt lại được tạo cho mục đích phát triển:', code);
+      return {
+        message: 'Mã đặt lại đã được tạo. Cấu hình SMTP để gửi thư.',
+        ...(this.isDevelopment() ? { code } : {}),
+      };
+    }
+  }
+
+  async verifyCode(dto: VerifyCodeDto) {
+    const entry = this.codeStore.get(dto.email);
+    if (!entry || entry.code !== dto.code || Date.now() > entry.expiresAt) {
+      throw new BadRequestException('Mã đặt lại không hợp lệ hoặc đã hết hạn');
+    }
+
+    return { message: 'Mã đã được xác minh thành công.' };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const entry = this.codeStore.get(dto.email);
+    if (!entry || entry.code !== dto.code || Date.now() > entry.expiresAt) {
+      throw new BadRequestException('Mã đặt lại không hợp lệ hoặc đã hết hạn');
+    }
+
+    const user = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (!user) {
+      throw new BadRequestException('Không tìm thấy người dùng');
+    }
+
+    user.passwordHash = await this.hashPassword(dto.newPassword);
+    await this.userRepository.save(user);
+    this.codeStore.delete(dto.email);
+
+    return { message: 'Mật khẩu đã được đặt lại thành công.' };
+  }
+
+  async getProfile(userId: number) {
+    const user = await this.userRepository.findOne({ where: { id: userId }, relations: { role: true } });
+    if (!user) {
+      throw new BadRequestException('Không tìm thấy người dùng');
+    }
+
+    if (!user.isActive) {
+      throw new ForbiddenException('Tài khoản của bạn đã bị ngưng hoạt động.');
+    }
+
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role?.name || 'customer',
+    };
+  }
+
+  async updateProfile(userId: number, dto: any) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new BadRequestException('Không tìm thấy người dùng');
+    }
+
+    if (dto.fullName !== undefined) user.fullName = dto.fullName;
+    if (dto.email !== undefined) user.email = dto.email;
+    if (dto.phone !== undefined) user.phone = dto.phone;
+
+    const saved = await this.userRepository.save(user);
+    return {
+      id: saved.id,
+      fullName: saved.fullName,
+      email: saved.email,
+      phone: saved.phone,
+      role: saved.role?.name || 'customer',
+    };
+  }
+
+  async changePassword(userId: number, dto: any) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new BadRequestException('Không tìm thấy người dùng');
+    }
+
+    const isMatch = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    }
+
+    user.passwordHash = await this.hashPassword(dto.newPassword);
+    await this.userRepository.save(user);
+
+    return { message: 'Mật khẩu đã được thay đổi thành công.' };
+  }
+
+  async getHistory(userId: number) {
+    const reservations = await this.reservationsService.findUserReservations(userId);
+    return {
+      reservations: reservations.map((r) => ({
+        id: r.id,
+        customerName: r.customerName,
+        phone: r.phone,
+        email: r.email,
+        date: r.reservationDate,
+        time: r.reservationTime,
+        guests: r.partySize,
+        table: r.tableNumber,
+        note: r.note,
+        status: r.status,
+        cancelReason: r.cancelReason,
+        cancelledBy: r.cancelledBy,
+        createdAt: r.createdAt,
+      })),
+      orders: [
+        { id: 'ORD-2001', date: '2026-07-18', total: 245000, status: 'completed' },
+        { id: 'ORD-2002', date: '2026-07-25', total: 128000, status: 'delivering' },
+      ],
+    };
+  }
+
+  async hashPassword(password: string) {
+    return bcrypt.hash(password, 10);
+  }
+
+  private generateSixDigitCode() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  private isDevelopment() {
+    return this.configService.get<string>('NODE_ENV') !== 'production';
+  }
+
+  async getUsers(includeInactive = false) {
+    const where = includeInactive ? {} : { isActive: true };
+    const users = await this.userRepository.find({ where, relations: { role: true } });
+    return users.map((u) => ({
+      id: u.id,
+      fullName: u.fullName,
+      email: u.email,
+      phone: u.phone,
+      role: u.role?.name || 'customer',
+      isActive: u.isActive,
+    }));
+  }
+
+  async getUserById(id: number) {
+    const user = await this.userRepository.findOne({ where: { id }, relations: { role: true } });
+    if (!user) {
+      throw new BadRequestException('Không tìm thấy người dùng');
+    }
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role?.name || 'customer',
+      isActive: user.isActive,
+    };
+  }
+
+  // Chỉ bật/tắt trạng thái hoạt động — KHÔNG xoá tài khoản khỏi hệ thống.
+  async toggleUserStatus(userId: number, isActive: boolean) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new BadRequestException('Không tìm thấy người dùng');
+    }
+
+    user.isActive = isActive;
+    await this.userRepository.save(user);
+
+    return {
+      message: isActive ? 'Tài khoản đã được kích hoạt lại.' : 'Tài khoản đã bị ngưng hoạt động.',
+      id: user.id,
+      isActive: user.isActive,
+    };
+  }
+
+  async createStaffAccount(dto: CreateStaffDto) {
+    const existing = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (existing) {
+      throw new BadRequestException('Email đã được đăng ký');
+    }
+
+    let role = await this.roleRepository.findOne({ where: { name: dto.role } });
+    if (!role) {
+      role = this.roleRepository.create({ name: dto.role, description: dto.role });
+      role = await this.roleRepository.save(role);
+    }
+
+    const passwordHash = await this.hashPassword(dto.password);
+    const user = this.userRepository.create({
+      roleId: role.id,
+      fullName: dto.fullName,
+      email: dto.email,
+      phone: dto.phone,
+      passwordHash,
+      isActive: true,
+    });
+
+    const saved = await this.userRepository.save(user);
+    return {
+      id: saved.id,
+      fullName: saved.fullName,
+      email: saved.email,
+      phone: saved.phone,
+      role: role.name,
+      isActive: saved.isActive,
+    };
+  }
+
+  // Admin chỉnh sửa thông tin người khác — khác với updateProfile (tự người dùng sửa thông tin của chính mình)
+  async updateUserByAdmin(id: number, dto: { fullName?: string; email?: string; phone?: string; role?: string }) {
+    const user = await this.userRepository.findOne({ where: { id }, relations: { role: true } });
+    if (!user) {
+      throw new BadRequestException('Không tìm thấy người dùng');
+    }
+
+    if (dto.email !== undefined && dto.email !== user.email) {
+      const existing = await this.userRepository.findOne({ where: { email: dto.email } });
+      if (existing) {
+        throw new BadRequestException('Email đã được sử dụng bởi tài khoản khác');
+      }
+      user.email = dto.email;
+    }
+
+    if (dto.fullName !== undefined) user.fullName = dto.fullName;
+    if (dto.phone !== undefined) user.phone = dto.phone;
+
+    if (dto.role !== undefined) {
+      let role = await this.roleRepository.findOne({ where: { name: dto.role } });
+      if (!role) {
+        role = this.roleRepository.create({ name: dto.role, description: dto.role });
+        role = await this.roleRepository.save(role);
+      }
+      user.roleId = role.id;
+    }
+
+    const saved = await this.userRepository.save(user);
+    const savedWithRole = await this.userRepository.findOne({ where: { id: saved.id }, relations: { role: true } });
+
+    if (!savedWithRole) {
+      throw new BadRequestException('Không tìm thấy người dùng sau khi cập nhật');
+    }
+
+    return {
+      id: savedWithRole.id,
+      fullName: savedWithRole.fullName,
+      email: savedWithRole.email,
+      phone: savedWithRole.phone,
+      role: savedWithRole.role?.name || 'customer',
+      isActive: savedWithRole.isActive,
+    };
+  }
+
+  private async sendMail(to: string, code: string) {
+    const transporter = nodemailer.createTransport({
+      host: this.configService.get<string>('MAIL_HOST') || 'smtp.gmail.com',
+      port: Number(this.configService.get<string>('MAIL_PORT') || 587),
+      secure: false,
+      auth: {
+        user: this.configService.get<string>('MAIL_USER') || 'your-email@gmail.com',
+        pass: this.configService.get<string>('MAIL_PASS') || 'your-app-password',
+      },
+    });
+
+    await transporter.sendMail({
+      from: this.configService.get<string>('MAIL_FROM') || 'Dola Restaurant <noreply@dola.local>',
+      to,
+      subject: 'Mã đặt lại mật khẩu',
+      text: `Mã đặt lại của bạn là ${code}`,
+    });
+  }
+}
