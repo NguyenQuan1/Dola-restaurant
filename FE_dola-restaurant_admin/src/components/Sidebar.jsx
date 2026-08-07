@@ -9,6 +9,7 @@ import {
   Tag,
   Newspaper,
   Star,
+  MessageCircle,
   Mail,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -23,6 +24,7 @@ const nav = [
   { to: '/khuyen-mai', label: 'Khuyến mãi', icon: Tag, roles: ['admin'] },
   { to: '/tin-tuc', label: 'Tin tức', icon: Newspaper, roles: ['admin'] },
   { to: '/danh-gia', label: 'Đánh giá', icon: Star, roles: ['admin', 'staff'] },
+  { to: '/tin-nhan', label: 'Tin nhắn', icon: MessageCircle, roles: ['admin', 'staff'] },
   { to: '/lien-he', label: 'Liên hệ', icon: Mail, roles: ['admin', 'staff'] },
 ]
 
@@ -67,10 +69,9 @@ export default function Sidebar() {
             to={to}
             end={end}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-colors ${
-                isActive
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-paper/60 hover:text-paper hover:bg-white/5'
+              `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-colors ${isActive
+                ? 'bg-white/10 text-white font-medium'
+                : 'text-paper/60 hover:text-paper hover:bg-white/5'
               }`
             }
           >

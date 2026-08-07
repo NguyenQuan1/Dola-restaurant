@@ -18,7 +18,8 @@ export default function Customers() {
     setError('')
     try {
       const { data } = await getUsers(showInactive)
-      setCustomers(data.filter((u) => u.role === 'customer'))
+      const list = Array.isArray(data) ? data : data.items || []
+      setCustomers(list.filter((u) => u.role === 'customer'))
     } catch (err) {
       setError(err.response?.data?.message || 'Không tải được danh sách khách hàng')
     } finally {

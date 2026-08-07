@@ -32,6 +32,10 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { Contact } from './contacts/entities/contact.entity';
 import { ChatbotModule } from './chatbot/chatbot.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { ChatModule } from './chat/chat.module';
+import { ChatSession } from './chat/entities/chat-session.entity';
+import { ChatMessage } from './chat/entities/chat-message.entity';
 
 
 const migrationsPath = path.join(__dirname, 'migrations', '*{.ts,.js}');
@@ -50,7 +54,7 @@ const migrationsPath = path.join(__dirname, 'migrations', '*{.ts,.js}');
         username: configService.get<string>('DB_USERNAME') || 'root',
         password: configService.get<string>('DB_PASSWORD') || 'quanvip2004',
         database: configService.get<string>('DB_NAME') || 'dola_restaurant',
-        entities: [User, Role, Category, Food, FoodImage, Review, ReviewReply, NewsCategory, News, NewsImage, Promotion, Reservation, Contact ],
+        entities: [User, Role, Category, Food, FoodImage, Review, ReviewReply, NewsCategory, News, NewsImage, Promotion, Reservation, Contact, ChatSession, ChatMessage],
         migrations: [migrationsPath],
         migrationsRun: true,
         synchronize: false,
@@ -67,6 +71,8 @@ const migrationsPath = path.join(__dirname, 'migrations', '*{.ts,.js}');
     ReservationsModule,
     ContactsModule,
     ChatbotModule,
+    DashboardModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [
@@ -77,4 +83,4 @@ const migrationsPath = path.join(__dirname, 'migrations', '*{.ts,.js}');
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

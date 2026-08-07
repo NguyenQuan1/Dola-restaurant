@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Groq from 'groq-sdk';
 import { FoodsService } from '../foods/foods.service';
@@ -6,6 +6,9 @@ import { ReservationsService } from '../reservations/reservations.service';
 import { PromotionsService } from '../promotions/promotions.service';
 import { AuthService } from '../auth/auth.service';
 import { ChatMessageDto } from './dto/chat-message.dto';
+import { ChatService } from '../chat/chat.service';
+import { ChatGateway } from '../chat/chat.gateway';
+import { ChatSession } from '../chat/entities/chat-session.entity';
 
 function removeAccents(str: string): string {
   if (!str) return '';
@@ -31,6 +34,10 @@ export class ChatbotService {
     private readonly reservationsService: ReservationsService,
     private readonly promotionsService: PromotionsService,
     private readonly authService: AuthService,
+    @Inject(forwardRef(() => ChatService))
+    private readonly chatService: ChatService,
+    @Inject(forwardRef(() => ChatGateway))
+    private readonly chatGateway: ChatGateway,
   ) {
     const apiKey = this.configService.get<string>('GROQ_API_KEY');
     if (apiKey) {
@@ -175,7 +182,7 @@ THÔNG TIN NHÀ HÀNG DOLA RESTAURANT:
 - Hotline: 1900 6750 | Điện thoại: 0988 123 456
 - Giờ mở cửa: 08:00 - 22:30 mỗi ngày (Kể cả Lễ, Tết)
 - Bãi đỗ xe: Miễn phí đỗ xe máy và xe ô tô, có bảo vệ trông giữ 24/7.
-- Giao hàng: Giao nhanh nội thành, miễn phí ship cho đơn từ 300.000đ trong bán kính 5km.
+// - Giao hàng: Giao nhanh nội thành, miễn phí ship cho đơn từ 300.000đ trong bán kính 5km.
 - Thanh toán: Tiền mặt, Chuyển khoản ngân hàng, Thẻ Visa/Mastercard, Ví MoMo, ZaloPay.
 
 QUY NẮC TRẢ LỜI:
@@ -194,12 +201,58 @@ QUY NẮC TRẢ LỜI:
   }
 
   /**
+   * sessionId từ DTO là string (frontend lưu localStorage). Nếu thiếu, không
+   * parse được, hoặc session không còn tồn tại -> tự tạo session mới thay vì
+   * throw lỗi, để khách luôn chat được kể cả lần đầu hoặc mất sessionId.
+   */
+  private async resolveSession(rawSessionId: string | undefined, userId: number | null): Promise<ChatSession> {
+    if (rawSessionId) {
+      const sessionId = Number(rawSessionId);
+      if (!Number.isNaN(sessionId)) {
+        try {
+          return await this.chatService.findSessionById(sessionId);
+        } catch {
+          // session không tồn tại (VD: đã bị xoá) -> rơi xuống tạo mới bên dưới
+        }
+      }
+    }
+    return this.chatService.createSession(userId);
+  }
+
+  /**
    * @param userId  id tài khoản đang đăng nhập, lấy từ req.user (JwtStrategy trả
    *                về { userId, email, role }) qua OptionalJwtAuthGuard ở controller.
    *                null nếu khách vãng lai — mọi luồng bên dưới đều phải chấp nhận
    *                null và không được throw lỗi vì chuyện đó.
+   * @param rawSessionId  sessionId dạng string do frontend gửi lên (localStorage).
    */
-  async handleChatMessage(dto: ChatMessageDto, userId: number | null = null) {
+  async handleChatMessage(dto: ChatMessageDto, userId: number | null = null, rawSessionId?: string) {
+    const session = await this.resolveSession(rawSessionId, userId);
+
+    // Lưu tin nhắn khách TRƯỚC, bất kể sau đó AI hay staff xử lý
+    const savedMsg = await this.chatService.addMessage(session.id, 'customer', userId, dto.message);
+
+    // Session đang có nhân viên xử lý -> không gọi AI nữa, chỉ lưu + báo real-time cho staff
+    if (session.status === 'waiting_staff' || session.status === 'staff') {
+      this.chatGateway.broadcastMessage(session.id, savedMsg);
+      return {
+        success: true,
+        reply: null,
+        sessionId: session.id,
+        handedOffToStaff: true,
+      };
+    }
+
+    const result = await this.generateAiReply(dto, userId, session);
+
+    if (result?.reply) {
+      await this.chatService.addMessage(session.id, 'ai', null, result.reply);
+    }
+
+    return { ...result, sessionId: session.id };
+  }
+
+  private async generateAiReply(dto: ChatMessageDto, userId: number | null, session: ChatSession) {
     const apiKey = this.configService.get<string>('GROQ_API_KEY');
     if (!this.groq && apiKey) {
       this.groq = new Groq({ apiKey });
@@ -255,30 +308,44 @@ QUY NẮC TRẢ LỜI:
               },
             },
           },
+          {
+            type: 'function',
+            function: {
+              name: 'escalateToStaff',
+              description:
+                'Chuyển hội thoại cho nhân viên thật xử lý trực tiếp. Dùng khi: khách yêu cầu gặp người thật/nhân viên, khách bực bội/phàn nàn/khiếu nại, hoặc câu hỏi vượt quá khả năng AI (sự cố đơn hàng, yêu cầu đặc biệt, khiếu nại dịch vụ).',
+              parameters: {
+                type: 'object',
+                properties: {
+                  reason: { type: 'string', description: 'Lý do ngắn gọn cần chuyển cho nhân viên' },
+                },
+              },
+            },
+          },
           // Hai tool dưới đây CHỈ được thêm vào khi khách đang đăng nhập —
           // khách vãng lai (userId null) sẽ không thấy các tool này trong
           // danh sách nên model không thể "ảo giác" ra dữ liệu cá nhân.
           ...(userId
             ? [
-                {
-                  type: 'function',
-                  function: {
-                    name: 'getMyProfile',
-                    description:
-                      'Lấy thông tin tài khoản của khách hàng đang đăng nhập (họ tên, email, số điện thoại, vai trò).',
-                    parameters: { type: 'object', properties: {} },
-                  },
+              {
+                type: 'function',
+                function: {
+                  name: 'getMyProfile',
+                  description:
+                    'Lấy thông tin tài khoản của khách hàng đang đăng nhập (họ tên, email, số điện thoại, vai trò).',
+                  parameters: { type: 'object', properties: {} },
                 },
-                {
-                  type: 'function',
-                  function: {
-                    name: 'getMyReservations',
-                    description:
-                      'Lấy danh sách toàn bộ đơn đặt bàn (kèm trạng thái) của khách hàng đang đăng nhập.',
-                    parameters: { type: 'object', properties: {} },
-                  },
+              },
+              {
+                type: 'function',
+                function: {
+                  name: 'getMyReservations',
+                  description:
+                    'Lấy danh sách toàn bộ đơn đặt bàn (kèm trạng thái) của khách hàng đang đăng nhập.',
+                  parameters: { type: 'object', properties: {} },
                 },
-              ]
+              },
+            ]
             : []),
         ];
 
@@ -364,6 +431,8 @@ QUY NẮC TRẢ LỜI:
               toolResult = await this.executeGetMyProfile(userId);
             } else if (name === 'getMyReservations') {
               toolResult = await this.executeGetMyReservations(userId);
+            } else if (name === 'escalateToStaff') {
+              toolResult = await this.executeEscalateToStaff(args, session.id);
             }
 
             messages.push({
@@ -405,6 +474,8 @@ QUY NẮC TRẢ LỜI:
                 toolResult = await this.executeGetMyProfile(userId);
               } else if (inline.name === 'getMyReservations') {
                 toolResult = await this.executeGetMyReservations(userId);
+              } else if (inline.name === 'escalateToStaff') {
+                toolResult = await this.executeEscalateToStaff(inline.args, session.id);
               }
 
               if (toolResult !== undefined) {
@@ -440,19 +511,53 @@ QUY NẮC TRẢ LỜI:
     }
 
     // Fallback Engine khi API Key hết quota hoặc lỗi
-    return this.handleFallbackMessage(dto.message, userId);
+    return this.handleFallbackMessage(dto.message, userId, session);
   }
 
   private async executeSearchFoods(args: any) {
     try {
-      const result = await this.foodsService.findAll({
-        search: args?.search,
+      const search = args?.search;
+      let result = await this.foodsService.findAll({
+        search,
         minPrice: args?.minPrice,
         maxPrice: args?.maxPrice,
         isActive: true,
         limit: 10,
       });
-      return result.items.map((food) => ({
+
+      // Model đôi khi sinh SAI dấu tiếng Việt trong search term — đặc biệt khi đi qua
+      // nhánh self-heal từ failed_generation, vì lúc đó model đang gõ text tự do
+      // (không qua structured JSON mode) nên dễ lệch dấu, ví dụ "bún tháng" bị sinh
+      // thành "buén thảng". Nếu search có dấu không ra kết quả, thử lại không dấu.
+      if (result.items.length === 0 && search) {
+        const noAccentSearch = removeAccents(search);
+        result = await this.foodsService.findAll({
+          search: noAccentSearch,
+          minPrice: args?.minPrice,
+          maxPrice: args?.maxPrice,
+          isActive: true,
+          limit: 10,
+        });
+      }
+
+      // Vẫn không có kết quả -> tự khớp thủ công không dấu trên danh sách món đang
+      // active, phòng trường hợp foodsService.findAll so khớp có dấu chặt (không tự
+      // chuẩn hoá dấu khi tìm kiếm).
+      if (result.items.length === 0 && search) {
+        const target = removeAccents(search);
+        const all = await this.foodsService.findAll({
+          minPrice: args?.minPrice,
+          maxPrice: args?.maxPrice,
+          isActive: true,
+          limit: 100,
+        });
+        result = {
+          ...all,
+          items: all.items.filter((f) => removeAccents(f.name).includes(target)),
+        };
+      }
+
+      return result.items.slice(0, 10).map((food) => ({
         id: food.id,
         name: food.name,
         price: food.price,
@@ -583,8 +688,37 @@ QUY NẮC TRẢ LỜI:
     }
   }
 
-  private async handleFallbackMessage(msg: string, userId: number | null = null) {
+  private async executeEscalateToStaff(args: any, sessionId: number) {
+    try {
+      const session = await this.chatService.escalate(sessionId, args?.reason);
+      this.chatGateway.notifyNewEscalation(session);
+      return {
+        status: 'success',
+        message: 'Đã chuyển hội thoại cho nhân viên. Hãy báo cho khách biết nhân viên sẽ tiếp nhận trong giây lát, không tiếp tục tư vấn thêm sau bước này.',
+      };
+    } catch (err: any) {
+      return { status: 'error', message: err?.message || 'Không thể chuyển cho nhân viên lúc này.' };
+    }
+  }
+
+  private async handleFallbackMessage(msg: string, userId: number | null = null, session?: ChatSession) {
     const raw = removeAccents(msg);
+
+    // Fallback không gọi được AI để "hiểu ý" -> nhận diện escalate bằng từ khoá cứng
+    const wantsHuman =
+      raw.includes('gap nhan vien') ||
+      raw.includes('noi chuyen voi nguoi') ||
+      raw.includes('nhan vien tu van') ||
+      raw.includes('khieu nai');
+
+    if (wantsHuman && session) {
+      const updated = await this.chatService.escalate(session.id, 'Khách yêu cầu qua kênh fallback (không dùng AI)');
+      this.chatGateway.notifyNewEscalation(updated);
+      return {
+        success: true,
+        reply: '🙏 Dạ em đã chuyển yêu cầu của Anh/Chị cho nhân viên tư vấn, xin chờ trong giây lát ạ!',
+      };
+    }
 
     // 0. Khách đang đăng nhập hỏi về tài khoản / đơn của mình — xử lý trước
     // các nhánh khác vì đây là câu hỏi cá nhân hoá, cần trả lời từ dữ liệu

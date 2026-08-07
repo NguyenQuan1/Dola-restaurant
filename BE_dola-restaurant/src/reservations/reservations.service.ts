@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Reservation, ReservationCancelledBy, ReservationStatus } from './entities/reservation.entity';
@@ -104,10 +104,33 @@ export class ReservationsService {
     const status: ReservationStatus =
       allowInitialStatus && dto.initialStatus ? dto.initialStatus : allowInitialStatus ? 'confirmed' : 'pending';
 
+    // 1. Kiểm tra đơn đặt bàn trùng lặp (cùng SĐT hoặc cùng Email, cùng ngày, đang ở trạng thái active)
+    const phone = dto.phone.trim();
+    const email = dto.email?.trim() || null;
+    const activeStatuses: ReservationStatus[] = ['pending', 'confirmed', 'seated'];
+
+    const duplicateConditions: any[] = [{ phone, reservationDate: dto.reservationDate }];
+    if (email) {
+      duplicateConditions.push({ email, reservationDate: dto.reservationDate });
+    }
+
+    const existingDuplicate = await this.reservationRepo.findOne({
+      where: duplicateConditions.map((cond) => ({
+        ...cond,
+        status: In(activeStatuses),
+      })),
+    });
+
+    if (existingDuplicate) {
+      throw new BadRequestException(
+        `Số điện thoại hoặc Email này đã có một đơn đặt bàn khác vào ngày ${dto.reservationDate} lúc ${existingDuplicate.reservationTime}. Quý khách vui lòng kiểm tra lại đơn đặt hiện tại!`,
+      );
+    }
+
     const reservation = this.reservationRepo.create({
       customerName: dto.customerName.trim(),
-      phone: dto.phone.trim(),
-      email: dto.email?.trim() || null,
+      phone,
+      email,
       partySize: dto.partySize,
       tableNumber: dto.tableNumber?.trim() || null,
       reservationDate: dto.reservationDate,
@@ -194,6 +217,27 @@ export class ReservationsService {
     if (cancelledBy === 'customer') {
       if (userId && reservation.userId && reservation.userId !== userId) {
         throw new BadRequestException('Bạn không có quyền huỷ đơn đặt bàn này');
+      }
+
+      // 1. Khách bắt buộc phải nhập lý do hủy bàn
+      if (!reason || !reason.trim()) {
+        throw new BadRequestException('Vui lòng nhập lý do hủy đặt bàn');
+      }
+
+      // 2. Không được hủy sát giờ (trong vòng 2 tiếng trước giờ hẹn)
+      const reservationDateTimeStr = `${reservation.reservationDate}T${reservation.reservationTime}`;
+      const reservationDateTime = new Date(reservationDateTimeStr);
+      const now = new Date();
+
+      if (!isNaN(reservationDateTime.getTime())) {
+        const diffMs = reservationDateTime.getTime() - now.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+
+        if (diffHours < 2) {
+          throw new BadRequestException(
+            'Không thể hủy đơn đặt bàn trong vòng 2 tiếng trước giờ hẹn. Vui lòng liên hệ hotline 1900 6750 để được hỗ trợ!',
+          );
+        }
       }
     }
 

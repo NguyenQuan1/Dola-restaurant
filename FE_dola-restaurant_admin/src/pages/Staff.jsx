@@ -23,7 +23,8 @@ export default function Staff() {
     setError('')
     try {
       const { data } = await getUsers(showInactive)
-      setStaff(data.filter((u) => u.role === 'admin' || u.role === 'staff'))
+      const list = Array.isArray(data) ? data : data.items || []
+      setStaff(list.filter((u) => u.role === 'admin' || u.role === 'staff'))
     } catch (err) {
       setError(err.response?.data?.message || 'Không tải được danh sách nhân viên')
     } finally {

@@ -305,7 +305,11 @@ export default function Home() {
             </motion.span>
 
             <WordByWordText
-              text="Món ăn Việt truyền thống, nấu bằng cả tấm lòng"
+              text="Món ăn Việt truyền thống,"
+              className="font-display mt-4 text-3xl font-semibold leading-tight text-jade-700 sm:text-4xl lg:text-5xl"
+            />
+            <WordByWordText
+              text="nấu bằng cả tấm lòng"
               className="font-display mt-4 text-3xl font-semibold leading-tight text-jade-700 sm:text-4xl lg:text-5xl"
             />
 

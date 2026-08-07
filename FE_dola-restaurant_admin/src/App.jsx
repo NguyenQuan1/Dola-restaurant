@@ -13,6 +13,7 @@ import News from './pages/News.jsx'
 import Reviews from './pages/Reviews.jsx'
 import GuestRoute from './components/GuestRoute.jsx'
 import Contacts from './pages/Contacts.jsx'
+import Messages from './pages/Messages.jsx'
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/khach-hang" element={<Customers />} />
         <Route path="/danh-gia" element={<Reviews />} />
         <Route path="/lien-he" element={<Contacts />} />
+        <Route path="/tin-nhan" element={<Messages />} />
 
         {/* Các trang chỉ admin được vào — staff gõ thẳng URL cũng bị chặn */}
         <Route

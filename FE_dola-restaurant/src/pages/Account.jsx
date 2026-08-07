@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { changePassword as changePasswordApi, getHistory, updateProfile as updateProfileApi } from '../api/auth'
 import { cancelMyReservation } from '../api/reservations'
+import CancelReservationModal from '../components/CancelReservationModal'
 
 const TABS = [
   { key: 'profile', label: 'Thông tin cá nhân' },
@@ -46,6 +47,8 @@ export default function Account() {
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
   const [savedMsg, setSavedMsg] = useState('')
   const [history, setHistory] = useState({ reservations: [] })
+  const [cancelModal, setCancelModal] = useState({ isOpen: false, reservation: null })
+  const [cancelLoading, setCancelLoading] = useState(false)
 
   const fetchUserHistory = () => {
     if (!user?.accessToken) return
@@ -67,14 +70,27 @@ export default function Account() {
     return <Navigate to="/dang-nhap" state={{ from: '/tai-khoan' }} replace />
   }
 
-  const handleCancelReservation = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy đơn đặt bàn này?')) return
+  const openCancelModal = (r) => {
+    setCancelModal({ isOpen: true, reservation: r })
+  }
+
+  const closeCancelModal = () => {
+    setCancelModal({ isOpen: false, reservation: null })
+  }
+
+  const handleCancelConfirm = async (id, reason) => {
+    setCancelLoading(true)
     try {
-      await cancelMyReservation(id)
+      await cancelMyReservation(id, reason)
       setSavedMsg('Đã hủy đặt bàn thành công')
+      setTimeout(() => setSavedMsg(''), 3000)
       fetchUserHistory()
+      closeCancelModal()
     } catch (err) {
       setSavedMsg(err.response?.data?.message || 'Không thể hủy đặt bàn')
+      setTimeout(() => setSavedMsg(''), 4000)
+    } finally {
+      setCancelLoading(false)
     }
   }
 
@@ -268,7 +284,7 @@ export default function Account() {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               type="button"
-                              onClick={() => handleCancelReservation(r.id)}
+                              onClick={() => openCancelModal(r)}
                               className="rounded-full border border-lacquer/30 px-3 py-1 text-xs font-semibold text-lacquer hover:bg-lacquer/10"
                             >
                               Hủy đặt bàn
@@ -336,6 +352,14 @@ export default function Account() {
           </div>
         </motion.div>
       </div>
+
+      <CancelReservationModal
+        isOpen={cancelModal.isOpen}
+        onClose={closeCancelModal}
+        onConfirm={handleCancelConfirm}
+        reservation={cancelModal.reservation}
+        loading={cancelLoading}
+      />
     </section>
   )
 }

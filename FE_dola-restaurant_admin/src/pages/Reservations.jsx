@@ -142,7 +142,7 @@ function FilterSelect({ value, onChange, options, className = '' }) {
   )
 }
 
-function RowMenu({ reservation, onChangeStatus, onOpenCancel, onDelete }) {
+function RowMenu({ reservation, onChangeStatus, onOpenCancel, onOpenDelete }) {
   const [open, setOpen] = useState(false)
   const [coords, setCoords] = useState(null)
   const triggerRef = useRef(null)
@@ -290,7 +290,7 @@ function RowMenu({ reservation, onChangeStatus, onOpenCancel, onDelete }) {
                 type="button"
                 onClick={() => {
                   setOpen(false)
-                  onDelete(reservation.id)
+                  onOpenDelete(reservation)
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
               >
@@ -335,6 +335,12 @@ export default function Reservations() {
   const [cancelReason, setCancelReason] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [cancelLoading, setCancelLoading] = useState(false)
+
+  // Delete Modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const fetchReservations = async () => {
     try {
@@ -403,13 +409,24 @@ export default function Reservations() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa đơn đặt bàn này?')) return
+  const handleOpenDelete = (reservation) => {
+    setDeleteTarget(reservation)
+    setDeleteError('')
+    setDeleteModalOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await reservationService.remove(id)
+      setDeleteLoading(true)
+      setDeleteError('')
+      await reservationService.remove(deleteTarget.id)
+      setDeleteModalOpen(false)
       fetchReservations()
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể xóa đơn đặt bàn')
+      setDeleteError(err.response?.data?.message || 'Không thể xóa đơn đặt bàn')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -712,7 +729,7 @@ export default function Reservations() {
             {!loading && pagedRows.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-5 py-10 text-center text-muted">
-                  Chưa có lịch đặt bàn cho ngày này
+                  Chưa có lịch đặt bàn cho ngày này
                 </td>
               </tr>
             )}
@@ -769,7 +786,7 @@ export default function Reservations() {
                         reservation={r}
                         onChangeStatus={handleChangeStatus}
                         onOpenCancel={handleOpenCancel}
-                        onDelete={handleDelete}
+                        onOpenDelete={handleOpenDelete}
                       />
                     </div>
                   </Td>
@@ -994,6 +1011,47 @@ export default function Reservations() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal Xóa Đơn Đặt Bàn */}
+      <Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Xóa Đơn Đặt Bàn">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50/50 p-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-red-600" />
+            <div className="text-sm text-ink-soft">
+              <p className="font-medium text-ink">Bạn có chắc chắn muốn xóa đơn đặt bàn này?</p>
+              <p className="mt-1">
+                Khách hàng: <strong>{deleteTarget?.name}</strong> ({deleteTarget?.phone})
+              </p>
+              <p>
+                Thời gian: <strong>{deleteTarget?.date}</strong> lúc{' '}
+                <strong>{deleteTarget?.time}</strong> ({deleteTarget?.guests} khách)
+              </p>
+              <p className="mt-2 text-xs text-red-600">Hành động này không thể hoàn tác.</p>
+            </div>
+          </div>
+
+          {deleteError && <p className="text-xs text-clay">{deleteError}</p>}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setDeleteModalOpen(false)}
+              disabled={deleteLoading}
+              className="px-4 py-2 text-sm rounded-lg border border-border text-ink-soft hover:bg-black/[0.03] focus-ring"
+            >
+              Hủy bỏ
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={deleteLoading}
+              className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 focus-ring font-medium disabled:opacity-50"
+            >
+              {deleteLoading ? 'Đang xóa...' : 'Xác nhận Xóa'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Modal Xem Chi Tiết */}

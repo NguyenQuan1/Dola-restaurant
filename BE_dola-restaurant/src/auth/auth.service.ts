@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +14,14 @@ import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { ReservationsService } from '../reservations/reservations.service';
+
+export interface FindAllUsersQuery {
+  search?: string;
+  role?: string;
+  includeInactive?: boolean;
+  page?: number;
+  limit?: number;
+}
 
 @Injectable()
 export class AuthService {
@@ -109,7 +117,17 @@ export class AuthService {
     };
   }
 
+  private purgeExpiredCodes() {
+    const now = Date.now();
+    for (const [email, entry] of this.codeStore.entries()) {
+      if (entry.expiresAt < now) {
+        this.codeStore.delete(email);
+      }
+    }
+  }
+
   async forgotPassword(dto: ForgotPasswordDto) {
+    this.purgeExpiredCodes();
     const user = await this.userRepository.findOne({ where: { email: dto.email } });
     if (!user) {
       return { message: 'Nếu địa chỉ email tồn tại, mã đặt lại đã được gửi.' };
@@ -134,6 +152,7 @@ export class AuthService {
   }
 
   async verifyCode(dto: VerifyCodeDto) {
+    this.purgeExpiredCodes();
     const entry = this.codeStore.get(dto.email);
     if (!entry || entry.code !== dto.code || Date.now() > entry.expiresAt) {
       throw new BadRequestException('Mã đặt lại không hợp lệ hoặc đã hết hạn');
@@ -253,17 +272,55 @@ export class AuthService {
     return this.configService.get<string>('NODE_ENV') !== 'production';
   }
 
-  async getUsers(includeInactive = false) {
-    const where = includeInactive ? {} : { isActive: true };
-    const users = await this.userRepository.find({ where, relations: { role: true } });
-    return users.map((u) => ({
-      id: u.id,
-      fullName: u.fullName,
-      email: u.email,
-      phone: u.phone,
-      role: u.role?.name || 'customer',
-      isActive: u.isActive,
-    }));
+  async getUsers(query: FindAllUsersQuery = {}) {
+    const where: any = {};
+
+    if (!query.includeInactive) {
+      where.isActive = true;
+    }
+
+    if (query.search) {
+      where.fullName = ILike(`%${query.search}%`);
+    }
+
+    if (query.role) {
+      where.role = { name: query.role };
+    }
+
+    const hasPagination = query.page !== undefined || query.limit !== undefined;
+    const page = Number(query.page) > 0 ? Number(query.page) : 1;
+    const limit = Number(query.limit) > 0 ? Number(query.limit) : 20;
+
+    const findOptions: any = {
+      where,
+      relations: { role: true },
+      order: { id: 'DESC' },
+    };
+
+    if (hasPagination) {
+      findOptions.skip = (page - 1) * limit;
+      findOptions.take = limit;
+      const [users, total] = await this.userRepository.findAndCount(findOptions);
+      const items = users.map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        email: u.email,
+        phone: u.phone,
+        role: u.role?.name || 'customer',
+        isActive: u.isActive,
+      }));
+      return { items, total, page, limit };
+    } else {
+      const users = await this.userRepository.find(findOptions);
+      return users.map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        email: u.email,
+        phone: u.phone,
+        role: u.role?.name || 'customer',
+        isActive: u.isActive,
+      }));
+    }
   }
 
   async getUserById(id: number) {
