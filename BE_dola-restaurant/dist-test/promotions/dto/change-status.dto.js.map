@@ -1,0 +1,1 @@
+{"version":3,"file":"change-status.dto.js","sourceRoot":"","sources":["../../../src/promotions/dto/change-status.dto.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,qDAAuC;AAGvC,MAAa,wBAAwB;IAInC,MAAM,CAAkB;CACzB;AALD,4DAKC;AADC;IAHC,IAAA,sBAAI,EAAC,CAAC,OAAO,EAAE,SAAS,EAAE,QAAQ,EAAE,SAAS,CAAC,EAAE;QAC/C,OAAO,EAAE,yBAAyB;KACnC,CAAC;;wDACsB"}

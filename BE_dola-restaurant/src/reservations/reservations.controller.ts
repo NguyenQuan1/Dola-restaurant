@@ -27,7 +27,7 @@ import type { ReservationStatus } from './entities/reservation.entity';
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('reservations')
 export class ReservationsController {
-  constructor(private readonly reservationsService: ReservationsService) {}
+  constructor(private readonly reservationsService: ReservationsService) { }
 
   @Get()
   @Roles('admin', 'staff')
@@ -35,6 +35,8 @@ export class ReservationsController {
     @Query('search') search?: string,
     @Query('status') status?: ReservationStatus,
     @Query('date') date?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -42,6 +44,8 @@ export class ReservationsController {
       search,
       status,
       date,
+      startDate,
+      endDate,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });

@@ -92,9 +92,10 @@ export class PromotionsService {
       type: dto.type.trim(),
       code: this.normalizeCode(dto.code),
       description: dto.description?.trim() || null,
-      conditions: dto.conditions?.trim() || null,
       discountType: dto.discountType ?? 'percent',
       discountValue: dto.discountValue,
+      usageLimit: dto.usageLimit ?? null,
+      usedCount: 0,
       startDate: dto.startDate,
       endDate: dto.endDate,
       startTime: dto.startTime ?? null,
@@ -123,17 +124,132 @@ export class PromotionsService {
     if (dto.description !== undefined) {
       promotion.description = dto.description?.trim() || null;
     }
-    if (dto.conditions !== undefined) {
-      promotion.conditions = dto.conditions?.trim() || null;
-    }
     if (dto.discountType !== undefined) promotion.discountType = dto.discountType;
     if (dto.discountValue !== undefined) promotion.discountValue = dto.discountValue;
+    if (dto.usageLimit !== undefined) promotion.usageLimit = dto.usageLimit;
     if (dto.startDate !== undefined) promotion.startDate = dto.startDate;
     if (dto.endDate !== undefined) promotion.endDate = dto.endDate;
     if (dto.startTime !== undefined) promotion.startTime = dto.startTime;
     if (dto.endTime !== undefined) promotion.endTime = dto.endTime;
 
     return this.saveWithUniqueCode(promotion);
+  }
+
+  /**
+   * Kiểm tra điều kiện và tính toán số tiền giảm giá của voucher đối với đơn hàng.
+   */
+  async validateAndCalculateVoucher(
+    code: string,
+    orderAmount: number,
+    context?: {
+      userId?: number;
+      isReservation?: boolean;
+      customerPhone?: string;
+      isFirstOrder?: boolean;
+    },
+  ): Promise<{
+    promotion: Promotion;
+    discountAmount: number;
+    finalAmount: number;
+  }> {
+    const normalizedCode = this.normalizeCode(code);
+    if (!normalizedCode) {
+      throw new BadRequestException('Vui lòng nhập mã khuyến mãi');
+    }
+
+    const promotion = await this.promotionRepo.findOne({
+      where: { code: normalizedCode },
+    });
+
+    if (!promotion) {
+      throw new BadRequestException(`Mã giảm giá "${normalizedCode}" không tồn tại`);
+    }
+
+    if (promotion.status !== 'ongoing') {
+      if (promotion.status === 'expired') {
+        throw new BadRequestException('Mã giảm giá này đã hết hạn sử dụng');
+      }
+      if (promotion.status === 'paused') {
+        throw new BadRequestException('Mã giảm giá này hiện đang tạm dừng áp dụng');
+      }
+      throw new BadRequestException('Mã giảm giá hiện chưa có hiệu lực');
+    }
+
+    // Kiểm tra giới hạn số lượt sử dụng
+    if (
+      promotion.usageLimit !== null &&
+      promotion.usageLimit !== undefined &&
+      promotion.usedCount >= promotion.usageLimit
+    ) {
+      throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
+    }
+
+    // Kiểm tra ngày hiệu lực (theo múi giờ local/VN)
+    const now = new Date();
+    // Chuyển sang YYYY-MM-DD
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(now);
+    if (todayStr < promotion.startDate) {
+      throw new BadRequestException(
+        `Mã giảm giá chỉ có hiệu lực từ ngày ${promotion.startDate}`,
+      );
+    }
+    if (todayStr > promotion.endDate) {
+      throw new BadRequestException('Mã giảm giá đã quá hạn sử dụng');
+    }
+
+    // Kiểm tra khung giờ trong ngày (nếu có cài đặt)
+    if (promotion.startTime || promotion.endTime) {
+      const timeStr = now.toLocaleTimeString('en-GB', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        hour12: false,
+      }); // HH:mm:ss
+      if (promotion.startTime && timeStr < promotion.startTime) {
+        throw new BadRequestException(
+          `Mã giảm giá chỉ áp dụng từ ${promotion.startTime.slice(0, 5)}`,
+        );
+      }
+      if (promotion.endTime && timeStr > promotion.endTime) {
+        throw new BadRequestException(
+          `Mã giảm giá chỉ áp dụng đến ${promotion.endTime.slice(0, 5)}`,
+        );
+      }
+    }
+
+    // Tính toán mức giảm giá
+    const subtotal = Math.max(0, Number(orderAmount) || 0);
+    let discountAmount = 0;
+    const discountVal = Number(promotion.discountValue) || 0;
+    if (promotion.discountType === 'percent') {
+      discountAmount = Math.round((subtotal * discountVal) / 100);
+    } else {
+      // 'fixed'
+      discountAmount = Math.min(discountVal, subtotal);
+    }
+
+    // Đảm bảo không giảm quá tổng đơn
+    discountAmount = Math.min(discountAmount, subtotal);
+    const finalAmount = Math.max(0, subtotal - discountAmount);
+
+    return {
+      promotion,
+      discountAmount,
+      finalAmount,
+    };
+  }
+
+  /**
+   * Tăng số lượt đã sử dụng của voucher lên 1 khi đơn hàng hoàn tất thanh toán.
+   */
+  async incrementUsedCount(promotionId: number): Promise<void> {
+    const promotion = await this.promotionRepo.findOne({ where: { id: promotionId } });
+    if (promotion) {
+      promotion.usedCount = (promotion.usedCount || 0) + 1;
+      // Nếu đạt giới hạn thì có thể tự động chuyển sang expired
+      if (promotion.usageLimit && promotion.usedCount >= promotion.usageLimit) {
+        promotion.status = 'expired';
+      }
+      await this.promotionRepo.save(promotion);
+    }
   }
 
   // Đổi trạng thái do admin bấm tay. Khi chuyển sang 'ongoing' sẽ tự động

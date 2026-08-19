@@ -13,7 +13,6 @@ export interface PromotionMailData {
   type: string;
   code?: string | null;
   description?: string | null;
-  conditions?: string | null;
   discountType: 'percent' | 'fixed';
   discountValue: number | string;
   startDate: string;
@@ -22,7 +21,7 @@ export interface PromotionMailData {
   endTime?: string | null;
 }
 
-// Tránh vỡ layout / lỗi HTML injection nếu title, description, conditions...
+// Tránh vỡ layout / lỗi HTML injection nếu title, description...
 // chứa ký tự đặc biệt (<, >, &, ...).
 function escapeHtml(value: string): string {
   return value
@@ -33,7 +32,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-// Xuống dòng trong textarea (description/conditions) -> <br> khi hiển thị HTML.
+// Xuống dòng trong textarea (description) -> <br> khi hiển thị HTML.
 function nl2br(value: string): string {
   return escapeHtml(value).replace(/\n/g, '<br />');
 }
@@ -65,7 +64,6 @@ export function buildPromotionMailText(promotion: PromotionMailData): string {
     promotion.code ? `Mã ưu đãi: ${promotion.code}` : '',
     `Thời gian áp dụng: từ ${promotion.startDate} đến ${promotion.endDate}${timeRange}`,
     promotion.description ? `Chi tiết: ${promotion.description}` : '',
-    promotion.conditions ? `Điều kiện áp dụng: ${promotion.conditions}` : '',
     'Ghé Dola Restaurant ngay hôm nay để không bỏ lỡ ưu đãi này!',
   ]
     .filter(Boolean)
@@ -96,26 +94,6 @@ export function buildPromotionMailHtml(promotion: PromotionMailData, ctaUrl = '#
             <p style="margin:0;font-size:15px;line-height:1.6;color:#3F3A36;">
               ${nl2br(promotion.description)}
             </p>
-          </td>
-        </tr>`
-    : '';
-
-  const conditionsBlock = promotion.conditions
-    ? `
-        <tr>
-          <td style="padding:20px 32px 0 32px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFF8ED;border:1px solid #F3E3C6;border-radius:10px;">
-              <tr>
-                <td style="padding:16px 18px;">
-                  <p style="margin:0 0 6px 0;font-size:13px;font-weight:700;color:#B45309;text-transform:uppercase;letter-spacing:.04em;">
-                    Điều kiện áp dụng
-                  </p>
-                  <p style="margin:0;font-size:14px;line-height:1.6;color:#5B5551;">
-                    ${nl2br(promotion.conditions)}
-                  </p>
-                </td>
-              </tr>
-            </table>
           </td>
         </tr>`
     : '';
@@ -216,7 +194,6 @@ export function buildPromotionMailHtml(promotion: PromotionMailData, ctaUrl = '#
             </tr>
 
             ${descriptionBlock}
-            ${conditionsBlock}
 
             <!-- CTA -->
             <tr>

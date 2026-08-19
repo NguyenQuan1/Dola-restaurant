@@ -14,6 +14,7 @@ import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { ReservationsService } from '../reservations/reservations.service';
+import { Order } from '../orders/entities/order.entity';
 
 export interface FindAllUsersQuery {
   search?: string;
@@ -27,10 +28,12 @@ export interface FindAllUsersQuery {
 export class AuthService {
   private readonly codeStore = new Map<string, { code: string; expiresAt: number }>();
   private readonly logger = new Logger(AuthService.name);
+  private transporter: nodemailer.Transporter | null = null;
 
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(Role) private readonly roleRepository: Repository<Role>,
+    @InjectRepository(Order) private readonly orderRepository: Repository<Order>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly reservationsService: ReservationsService,
@@ -236,7 +239,15 @@ export class AuthService {
   }
 
   async getHistory(userId: number) {
-    const reservations = await this.reservationsService.findUserReservations(userId);
+    const [reservations, orders] = await Promise.all([
+      this.reservationsService.findUserReservations(userId),
+      this.orderRepository.find({
+        where: { userId },
+        relations: ['table', 'orderItems', 'orderItems.food'],
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
+
     return {
       reservations: reservations.map((r) => ({
         id: r.id,
@@ -253,10 +264,19 @@ export class AuthService {
         cancelledBy: r.cancelledBy,
         createdAt: r.createdAt,
       })),
-      orders: [
-        { id: 'ORD-2001', date: '2026-07-18', total: 245000, status: 'completed' },
-        { id: 'ORD-2002', date: '2026-07-25', total: 128000, status: 'delivering' },
-      ],
+      orders: orders.map((o) => ({
+        id: o.code,
+        orderId: o.id,
+        date: o.createdAt ? o.createdAt.toISOString().slice(0, 10) : '',
+        total: Number(o.totalAmount),
+        status: o.status,
+        type: o.type,
+        paymentStatus: o.paymentStatus,
+        paymentMethod: o.paymentMethod,
+        tableCode: o.table?.code || null,
+        itemsCount: o.orderItems?.length || 0,
+        createdAt: o.createdAt,
+      })),
     };
   }
 
@@ -432,16 +452,25 @@ export class AuthService {
     };
   }
 
-  private async sendMail(to: string, code: string) {
-    const transporter = nodemailer.createTransport({
+  private getTransporter(): nodemailer.Transporter {
+    if (this.transporter) return this.transporter;
+
+    const user = this.configService.get<string>('MAIL_USER') || 'your-email@gmail.com';
+    const pass = this.configService.get<string>('MAIL_PASS') || 'your-app-password';
+
+    this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('MAIL_HOST') || 'smtp.gmail.com',
       port: Number(this.configService.get<string>('MAIL_PORT') || 587),
       secure: false,
-      auth: {
-        user: this.configService.get<string>('MAIL_USER') || 'your-email@gmail.com',
-        pass: this.configService.get<string>('MAIL_PASS') || 'your-app-password',
-      },
+      pool: true,
+      auth: { user, pass },
     });
+
+    return this.transporter;
+  }
+
+  private async sendMail(to: string, code: string) {
+    const transporter = this.getTransporter();
 
     await transporter.sendMail({
       from: this.configService.get<string>('MAIL_FROM') || 'Dola Restaurant <noreply@dola.local>',

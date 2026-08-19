@@ -46,6 +46,15 @@ export default function Reservation() {
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) err.email = 'Email không hợp lệ'
     if (!form.date) err.date = 'Vui lòng chọn ngày'
     if (!form.time) err.time = 'Vui lòng chọn giờ'
+
+    if (form.date && form.time) {
+      const selectedDateTime = new Date(`${form.date}T${form.time}`)
+      if (isNaN(selectedDateTime.getTime()) || selectedDateTime.getTime() < Date.now() - 60 * 1000) {
+        err.date = 'Thời gian đặt bàn không được ở quá khứ'
+        err.time = 'Thời gian đặt bàn không được ở quá khứ'
+      }
+    }
+
     setErrors(err)
     return Object.keys(err).length === 0
   }
@@ -195,6 +204,7 @@ export default function Reservation() {
                 <label className="text-xs font-medium text-ink-soft">Ngày *</label>
                 <input
                   type="date"
+                  min={new Date().toISOString().split('T')[0]}
                   value={form.date}
                   onChange={handleChange('date')}
                   disabled={loading}

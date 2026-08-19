@@ -14,6 +14,9 @@ import Reviews from './pages/Reviews.jsx'
 import GuestRoute from './components/GuestRoute.jsx'
 import Contacts from './pages/Contacts.jsx'
 import Messages from './pages/Messages.jsx'
+import Table from './pages/Table.jsx'
+import QrPrintPage from './pages/QrPrintPage.jsx'
+import OrdersManagement from './pages/OrdersManagement.jsx'
 
 export default function App() {
   return (
@@ -33,6 +36,9 @@ export default function App() {
         <Route path="/danh-muc" element={<Categories />} />
         <Route path="/mon-an" element={<Foods />} />
         <Route path="/dat-ban" element={<Reservations />} />
+        <Route path="/dat-mon&thanh-toan" element={<OrdersManagement />} />
+        <Route path="/quan-ly-ban" element={<Table />} />
+        <Route path="/quan-ly-ban/ma-qr" element={<QrPrintPage />} />
         <Route path="/khach-hang" element={<Customers />} />
         <Route path="/danh-gia" element={<Reviews />} />
         <Route path="/lien-he" element={<Contacts />} />

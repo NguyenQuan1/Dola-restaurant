@@ -1,0 +1,1 @@
+{"version":3,"file":"change-status.dto.js","sourceRoot":"","sources":["../../../src/reservations/dto/change-status.dto.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,qDAAuC;AAKvC,MAAa,0BAA0B;IAIrC,MAAM,CAAmD;CAC1D;AALD,gEAKC;AADC;IAHC,IAAA,sBAAI,EAAC,CAAC,WAAW,EAAE,QAAQ,EAAE,WAAW,EAAE,SAAS,CAAC,EAAE;QACrD,OAAO,EAAE,yBAAyB;KACnC,CAAC;;0DACuD"}

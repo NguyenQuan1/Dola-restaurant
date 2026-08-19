@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -59,8 +60,13 @@ export class CreateReservationDto {
   // Chỉ có tác dụng khi admin/staff tạo đơn (ReservationsController sẽ dùng,
   // PublicReservationsController luôn bỏ qua field này và ép 'pending').
   @IsOptional()
-  @IsIn(['pending', 'confirmed'], {
-    message: 'Trạng thái khởi tạo chỉ có thể là pending hoặc confirmed',
+  @IsIn(['pending', 'confirmed', 'seated'], {
+    message: 'Trạng thái khởi tạo chỉ có thể là pending, confirmed hoặc seated',
   })
-  initialStatus?: Extract<ReservationStatus, 'pending' | 'confirmed'>;
+  initialStatus?: Extract<ReservationStatus, 'pending' | 'confirmed' | 'seated'>;
+
+  /** Admin/staff: khách vãng lai tại quầy — bỏ qua kiểm tra giờ trong quá khứ */
+  @IsOptional()
+  @IsBoolean()
+  walkIn?: boolean;
 }

@@ -453,6 +453,13 @@ export default function Reservations() {
       setFormError('Vui lòng chọn ngày và giờ đặt bàn')
       return
     }
+    if (form.date && form.time) {
+      const selectedDateTime = new Date(`${form.date}T${form.time}`)
+      if (isNaN(selectedDateTime.getTime()) || selectedDateTime.getTime() < Date.now() - 60 * 1000) {
+        setFormError('Thời gian đặt bàn không được ở quá khứ')
+        return
+      }
+    }
     if (!form.guests || Number(form.guests) <= 0) {
       setFormError('Số người phải lớn hơn 0')
       return
@@ -884,6 +891,7 @@ export default function Reservations() {
               <label className="mb-1 block text-sm font-medium text-ink">Ngày đặt *</label>
               <input
                 type="date"
+                min={new Date().toISOString().split('T')[0]}
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
                 disabled={createLoading}

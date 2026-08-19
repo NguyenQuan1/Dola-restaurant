@@ -9,10 +9,7 @@ import {
 export type PromotionStatus = 'draft' | 'ongoing' | 'paused' | 'expired';
 export type PromotionDiscountType = 'percent' | 'fixed';
 
-// Lưu ý: chưa khai báo quan hệ với Food/Category ở đây vì phạm vi áp dụng
-// (món/danh mục/toàn đơn) sẽ được định nghĩa sau trong `conditions`.
-// Khi chốt xong, có thể thêm bảng nối (promotion_foods / promotion_categories)
-// thay vì nhồi hết vào JSON.
+// Lưu ý: chưa khai báo quan hệ với Food/Category ở đây.
 
 @Entity('promotions')
 export class Promotion {
@@ -38,11 +35,6 @@ export class Promotion {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  // Điều kiện áp dụng — mô tả bằng văn bản tự do (vd: "Áp dụng cho đơn từ
-  // 200.000đ, không dùng chung với voucher khác").
-  @Column({ type: 'text', nullable: true })
-  conditions: string | null;
-
   @Column({
     name: 'discount_type',
     type: 'enum',
@@ -53,6 +45,14 @@ export class Promotion {
 
   @Column({ name: 'discount_value', type: 'decimal', precision: 10, scale: 0 })
   discountValue: number;
+
+  // Giới hạn tổng số lượt sử dụng voucher (null nghĩa là không giới hạn)
+  @Column({ name: 'usage_limit', type: 'int', nullable: true })
+  usageLimit: number | null;
+
+  // Số lượt voucher đã được sử dụng thành công
+  @Column({ name: 'used_count', type: 'int', default: 0 })
+  usedCount: number;
 
   @Column({ name: 'start_date', type: 'date' })
   startDate: string;

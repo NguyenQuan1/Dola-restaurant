@@ -120,9 +120,6 @@ function PromoCard({ promo, index, copied, onCopy }) {
         {promo.description && (
           <p className="mt-2.5 text-sm leading-relaxed text-ink-soft">{promo.description}</p>
         )}
-        {promo.conditions && (
-          <p className="mt-2 text-xs italic leading-relaxed text-ink-soft/70">{promo.conditions}</p>
-        )}
 
         {/* CON DẤU GIẢM GIÁ */}
         <motion.div

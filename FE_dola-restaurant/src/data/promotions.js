@@ -58,7 +58,7 @@ export const promoGroups = [
 ]
 
 export const voucherCodes = {
-  DOLA50K: { type: 'fixed', value: 50000, minOrder: 200000 },
-  NEWMEM: { type: 'percent', value: 15, minOrder: 0 },
-  FLASH12H: { type: 'percent', value: 25, minOrder: 0 },
+  DOLA50K: { type: 'fixed', value: 50000 },
+  NEWMEM: { type: 'percent', value: 15 },
+  FLASH12H: { type: 'percent', value: 25 },
 }

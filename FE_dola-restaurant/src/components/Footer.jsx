@@ -37,15 +37,6 @@ export default function Footer() {
     <footer className="bg-jade-900 text-ivory">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-6 py-16 sm:grid-cols-2 lg:grid-cols-4 lg:px-10">
         <div>
-          {/* <div className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gold/60 font-display text-lg text-gold-light">
-              D
-            </span>
-            <div className="flex flex-col leading-none">
-              <span className="font-display text-xl font-semibold text-ivory">Dola</span>
-              <span className="font-script text-sm italic tracking-widest text-gold-light">Restaurant</span>
-            </div>
-          </div> */}
           <Link to="/" className="flex items-center gap-2.5">
             <img
               src="https://6d39pwi252.ucarecd.net/ffdbd900-1103-4034-bb75-140e28891dfe/Gemini_Generated_Image_jlcrvpjlcrvpjlcrremovebgpreview.png"
@@ -91,9 +82,7 @@ export default function Footer() {
         <div>
           <h4 className="font-display text-base font-semibold text-gold-light">Giờ mở cửa</h4>
           <ul className="mt-4 space-y-2.5 text-sm text-ivory/65">
-            <li className="flex justify-between gap-4"><span>Thứ 2 - Thứ 6</span><span>9:00 - 22:00</span></li>
-            <li className="flex justify-between gap-4"><span>Thứ 7 - Chủ nhật</span><span>8:00 - 23:00</span></li>
-            <li className="flex justify-between gap-4"><span>Ngày lễ, Tết</span><span>8:00 - 23:00</span></li>
+            <li className="flex justify-between gap-4"><span>8:00 - 22:30 hàng ngày</span></li>
           </ul>
         </div>
 

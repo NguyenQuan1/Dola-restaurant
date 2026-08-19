@@ -13,9 +13,9 @@ const emptyForm = {
   type: '',
   code: '',
   description: '',
-  conditions: '',
   discountType: 'percent',
   discountValue: '',
+  usageLimit: '',
   startDate: '',
   endDate: '',
   startTime: '',
@@ -103,9 +103,8 @@ function SelectField({ value, onChange, options }) {
                 onChange(opt.value)
                 setOpen(false)
               }}
-              className={`block w-full px-3 py-2 text-left text-sm ${
-                opt.value === value ? 'bg-teal/10 font-medium text-teal' : 'text-ink hover:bg-black/[0.03]'
-              }`}
+              className={`block w-full px-3 py-2 text-left text-sm ${opt.value === value ? 'bg-teal/10 font-medium text-teal' : 'text-ink hover:bg-black/[0.03]'
+                }`}
             >
               {opt.label}
             </button>
@@ -204,9 +203,8 @@ function StatusMenu({ promotion, onChangeStatus, onDelete, canEdit }) {
                   setOpen(false)
                   onChangeStatus(status)
                 }}
-                className={`flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm hover:bg-black/[0.03] ${
-                  status === 'expired' ? 'text-clay' : 'text-teal'
-                }`}
+                className={`flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm hover:bg-black/[0.03] ${status === 'expired' ? 'text-clay' : 'text-teal'
+                  }`}
               >
                 <Icon size={14} />
                 {label}
@@ -305,9 +303,9 @@ export default function Promotions() {
       type: p.type || '',
       code: p.code || '',
       description: p.description || '',
-      conditions: p.conditions || '',
       discountType: p.discountType || 'percent',
       discountValue: p.discountValue ?? '',
+      usageLimit: p.usageLimit ?? '',
       startDate: p.startDate || '',
       endDate: p.endDate || '',
       startTime: p.startTime ? p.startTime.slice(0, 5) : '',
@@ -347,9 +345,9 @@ export default function Promotions() {
         type: trimmedType,
         code: form.code?.trim().toUpperCase() || undefined,
         description: form.description?.trim() || undefined,
-        conditions: form.conditions?.trim() || undefined,
         discountType: form.discountType,
         discountValue: Number(form.discountValue) || 0,
+        usageLimit: form.usageLimit !== '' ? Number(form.usageLimit) : undefined,
         startDate: form.startDate,
         endDate: form.endDate,
         startTime: form.startTime || undefined,
@@ -430,8 +428,8 @@ export default function Promotions() {
   // "Bắt đầu", còn từ 'paused' thì gọi là "Tiếp tục".
   const statusConfirmLabel = statusChange
     ? NEXT_ACTIONS[statusChange.promotion.status]?.find(
-        (action) => action.status === statusChange.nextStatus,
-      )?.label
+      (action) => action.status === statusChange.nextStatus,
+    )?.label
     : undefined
 
   return (
@@ -490,7 +488,14 @@ export default function Promotions() {
                     <span className="text-xs text-muted">—</span>
                   )}
                 </Td>
-                <Td className="font-mono">{formatValue(p)}</Td>
+                <Td>
+                  <div className="font-mono font-medium text-ink">{formatValue(p)}</div>
+                  {p.usageLimit ? (
+                    <div className="text-[11px] text-teal">Lượt dùng: {p.usedCount || 0}/{p.usageLimit}</div>
+                  ) : (
+                    (p.usedCount || 0) > 0 && <div className="text-[11px] text-teal">Đã dùng: {p.usedCount}</div>
+                  )}
+                </Td>
                 <Td className="text-xs text-muted">{formatTimeRange(p)}</Td>
                 <Td>
                   <StatusMenu
@@ -545,18 +550,18 @@ export default function Promotions() {
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus-ring"
-                placeholder="Ví dụ: Giảm giá hóa đơn, Mua 1 tặng 1, Freeship..."
+                placeholder="Ví dụ: Giảm giá hóa đơn, Tặng 1 món..."
               />
             </div>
             <div className="flex-1">
               <label className="mb-1 block text-sm font-medium text-ink">
-                Mã khuyến mãi <span className="text-muted font-normal">(không bắt buộc)</span>
+                Mã khuyến mãi
               </label>
               <input
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-mono tracking-wide focus-ring"
-                placeholder="Ví dụ: MUAHE10"
+                placeholder="Ví dụ: DOLA24"
               />
             </div>
           </div>
@@ -569,17 +574,6 @@ export default function Promotions() {
               rows={2}
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus-ring"
               placeholder="Mô tả ngắn về chương trình (không bắt buộc)"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">Điều kiện áp dụng</label>
-            <textarea
-              value={form.conditions}
-              onChange={(e) => setForm({ ...form, conditions: e.target.value })}
-              rows={2}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              placeholder="Ví dụ: Áp dụng cho đơn từ 200.000đ, không dùng chung voucher khác (không bắt buộc)"
             />
           </div>
 
@@ -603,6 +597,19 @@ export default function Promotions() {
                 value={form.discountValue}
                 onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus-ring"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Giới hạn lượt dùng
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={form.usageLimit}
+                onChange={(e) => setForm({ ...form, usageLimit: e.target.value })}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus-ring"
+                placeholder="Ví dụ: 100"
               />
             </div>
           </div>
@@ -631,7 +638,7 @@ export default function Promotions() {
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <label className="mb-1 block text-sm font-medium text-ink">
-                Khung giờ bắt đầu <span className="text-muted font-normal">(không bắt buộc)</span>
+                Giờ bắt đầu <span className="text-muted font-normal">(không bắt buộc)</span>
               </label>
               <input
                 type="time"
@@ -642,7 +649,7 @@ export default function Promotions() {
             </div>
             <div className="flex-1">
               <label className="mb-1 block text-sm font-medium text-ink">
-                Khung giờ kết thúc <span className="text-muted font-normal">(không bắt buộc)</span>
+                Giờ kết thúc <span className="text-muted font-normal">(không bắt buộc)</span>
               </label>
               <input
                 type="time"

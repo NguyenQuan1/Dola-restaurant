@@ -36,11 +36,6 @@ export class CreatePromotionDto {
   @IsString()
   description?: string;
 
-  // Điều kiện áp dụng — mô tả tự do, vd: "Áp dụng cho đơn từ 200.000đ"
-  @IsOptional()
-  @IsString()
-  conditions?: string;
-
   @IsOptional()
   @IsIn(['percent', 'fixed'], {
     message: 'Loại giảm giá phải là percent hoặc fixed',
@@ -50,6 +45,11 @@ export class CreatePromotionDto {
   @IsNumber({}, { message: 'Giá trị khuyến mãi phải là số' })
   @Min(0)
   discountValue: number;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'Giới hạn lượt dùng phải là số' })
+  @Min(1)
+  usageLimit?: number;
 
   @IsDateString({}, { message: 'Ngày bắt đầu không hợp lệ' })
   startDate: string;

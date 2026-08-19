@@ -36,10 +36,6 @@ export class UpdatePromotionDto {
   description?: string;
 
   @IsOptional()
-  @IsString()
-  conditions?: string;
-
-  @IsOptional()
   @IsIn(['percent', 'fixed'], {
     message: 'Loại giảm giá phải là percent hoặc fixed',
   })
@@ -49,6 +45,11 @@ export class UpdatePromotionDto {
   @IsNumber({}, { message: 'Giá trị khuyến mãi phải là số' })
   @Min(0)
   discountValue?: number;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'Giới hạn lượt dùng phải là số' })
+  @Min(1)
+  usageLimit?: number;
 
   @IsOptional()
   @IsDateString({}, { message: 'Ngày bắt đầu không hợp lệ' })

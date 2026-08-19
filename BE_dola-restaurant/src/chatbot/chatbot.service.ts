@@ -26,7 +26,7 @@ export class ChatbotService {
   private readonly logger = new Logger(ChatbotService.name);
   private groq: Groq | null = null;
   // Model miễn phí trên Groq, hỗ trợ tool/function calling, tốc độ rất nhanh
-  private readonly GROQ_MODEL = 'llama-3.3-70b-versatile';
+  private readonly GROQ_MODEL = 'openai/gpt-oss-120b';
 
   constructor(
     private readonly configService: ConfigService,
@@ -48,7 +48,7 @@ export class ChatbotService {
   /**
    * Gọi Groq với retry khi gặp lỗi:
    * - 429 (rate-limit tạm thời): chờ rồi thử lại.
-   * - tool_use_failed (model sinh sai cú pháp gọi tool, khá phổ biến với llama-3.3-70b-versatile):
+   * - tool_use_failed (model sinh sai cú pháp gọi tool):
    *   thử lại 1 lần với temperature thấp hơn để giảm khả năng lặp lỗi.
    * Nếu vẫn lỗi sau khi hết lượt retry, ném lỗi ra ngoài để rơi vào fallback engine.
    */
@@ -112,7 +112,7 @@ export class ChatbotService {
   }
 
   /**
-   * Đôi khi model (llama-3.3-70b-versatile qua Groq) không trả về đúng chuẩn tool_calls
+   * Đôi khi model (openai/gpt-oss-120b qua Groq) không trả về đúng chuẩn tool_calls
    * mà nhét thẳng cú pháp lỗi kiểu <function=name{"arg":"val"}> vào content text.
    * Hàm này phát hiện & bóc tách tên hàm + tham số từ cú pháp lỗi đó để tự xử lý,
    * thay vì để lộ cú pháp kỹ thuật ra cho người dùng.
@@ -185,7 +185,7 @@ THÔNG TIN NHÀ HÀNG DOLA RESTAURANT:
 // - Giao hàng: Giao nhanh nội thành, miễn phí ship cho đơn từ 300.000đ trong bán kính 5km.
 - Thanh toán: Tiền mặt, Chuyển khoản ngân hàng, Thẻ Visa/Mastercard, Ví MoMo, ZaloPay.
 
-QUY NẮC TRẢ LỜI:
+QUY TẮC TRẢ LỜI:
 1. Luôn lịch sự, thân thiện, xưng "Dola Restaurant" hoặc "Em" và gọi khách là "Anh/Chị" (nếu chat bằng Tiếng Việt).
 2. Tự động phản hồi bằng chính ngôn ngữ của khách (Tiếng Việt, Tiếng Anh, Tiếng Hàn, Tiếng Nhật, Tiếng Trung...).
 3. Khi khách hỏi về món ăn / thực đơn / giá tiền: Dùng công cụ searchFoods để tìm thông tin chính xác từ database nhà hàng.
@@ -227,7 +227,7 @@ QUY NẮC TRẢ LỜI:
    * @param rawSessionId  sessionId dạng string do frontend gửi lên (localStorage).
    */
   async handleChatMessage(dto: ChatMessageDto, userId: number | null = null, rawSessionId?: string) {
-    const session = await this.resolveSession(rawSessionId, userId);
+    const session = await this.resolveSession(rawSessionId || dto.sessionId, userId);
 
     // Lưu tin nhắn khách TRƯỚC, bất kể sau đó AI hay staff xử lý
     const savedMsg = await this.chatService.addMessage(session.id, 'customer', userId, dto.message);

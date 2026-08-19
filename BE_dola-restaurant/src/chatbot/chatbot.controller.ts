@@ -11,6 +11,6 @@ export class ChatbotController {
   @Post('message')
   async handleMessage(@Body() dto: ChatMessageDto, @Req() req: any) {
     const userId: number | null = req.user?.userId ?? null;
-    return this.chatbotService.handleChatMessage(dto, userId);
+    return this.chatbotService.handleChatMessage(dto, userId, dto.sessionId);
   }
 }

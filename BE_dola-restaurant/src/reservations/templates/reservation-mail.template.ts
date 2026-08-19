@@ -71,6 +71,22 @@ export function buildReservationCancelledMailText(data: ReservationMailData): st
     .join('\n');
 }
 
+export function buildReservationReminderMailText(data: ReservationMailData): string {
+  return [
+    `Xin chào ${data.customerName},`,
+    `Dola Restaurant xin nhắc bạn lịch đặt bàn sắp diễn ra (sau 4 giờ tới):`,
+    `Ngày: ${data.reservationDate}`,
+    `Giờ: ${formatReservationTime(data.reservationTime)}`,
+    `Số người: ${data.partySize}`,
+    data.tableNumber ? `Bàn số: ${data.tableNumber}` : '',
+    `Điện thoại: ${data.phone}`,
+    data.note ? `Yêu cầu đặc biệt: ${data.note}` : '',
+    'Vui lòng đến đúng giờ để nhà hàng có thể phục vụ tốt nhất. Trân trọng!',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 // ---- HTML ----
 
 function baseWrapper(headerColor: string, headerEmoji: string, headerTitle: string, bodyContent: string): string {
@@ -235,3 +251,25 @@ export function buildReservationCancelledMailHtml(data: ReservationMailData): st
 
   return baseWrapper('linear-gradient(135deg,#B42318,#E05252)', '❌', 'Đặt bàn đã bị huỷ', body);
 }
+
+export function buildReservationReminderMailHtml(data: ReservationMailData): string {
+  const body = `
+            <tr>
+              <td style="padding:24px 32px 0 32px;text-align:center;">
+                <p style="margin:0;font-size:15px;color:#5B5551;">
+                  Xin chào <strong style="color:#1F2937;">${escapeHtml(data.customerName)}</strong>, Dola Restaurant xin nhắc bạn lịch đặt bàn sắp diễn ra trong 4 giờ tới.
+                </p>
+              </td>
+            </tr>
+            ${reservationInfoTable(data)}
+            <tr>
+              <td style="padding:24px 32px 8px 32px;text-align:center;">
+                <p style="margin:0;font-size:13px;color:#9C9691;">
+                  Vui lòng đến đúng giờ để được phục vụ tốt nhất. Nếu cần hỗ trợ hoặc thay đổi lịch, hãy gọi hotline nhà hàng!
+                </p>
+              </td>
+            </tr>`;
+
+  return baseWrapper('linear-gradient(135deg,#D97706,#F59E0B)', '⏰', 'Nhắc nhở lịch đặt bàn', body);
+}
+

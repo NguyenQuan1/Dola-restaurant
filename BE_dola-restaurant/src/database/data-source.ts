@@ -12,9 +12,13 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD || 'quanvip2004',
   database: process.env.DB_NAME || 'dola_restaurant',
 
-  entities: [path.join(__dirname, '../**/*.entity{.ts,.js}')],
+  entities: [
+    path.join(__dirname, process.env.NODE_ENV === 'production' ? '../**/*.entity.js' : '../**/*.entity.ts'),
+  ],
 
-  migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
+  migrations: [
+    path.join(__dirname, process.env.NODE_ENV === 'production' ? '../migrations/*.js' : '../migrations/*.ts'),
+  ],
 
   synchronize: false,
   logging: false,

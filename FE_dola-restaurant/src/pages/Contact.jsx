@@ -6,7 +6,7 @@ const CONTACT_INFO = [
   { label: 'Địa chỉ', value: '123 Đường Trần Phú, Hải Châu, Đà Nẵng' },
   { label: 'Hotline', value: '0905 123 456' },
   { label: 'Email', value: 'hello@dolarestaurant.vn' },
-  { label: 'Giờ mở cửa', value: '9:00–22:00 (Các ngày trong tuần) 8:00–23:00 (Thứ 7,Chủ nhật&Lễ)' },
+  { label: 'Giờ mở cửa', value: ' 8:00 - 22:30 hàng ngày' },
 ]
 
 // Cùng bộ variants với Home.jsx để chuyển động nhất quán trên toàn site

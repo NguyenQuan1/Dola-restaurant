@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, Send, CheckCheck, UserCheck, Inbox, CheckCircle, RefreshCw } from 'lucide-react';
+import { Search, Send, CheckCheck, UserCheck, Inbox, CheckCircle, RefreshCw, AlertTriangle } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { chatApi } from '../api/chat';
+import Modal from '../components/Modal.jsx';
 
 function initials(name = '') {
   const parts = name.trim().split(' ').filter(Boolean);
@@ -50,6 +51,12 @@ export default function Messages() {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef(null);
   const socketRef = useRef(null);
+
+  // Close Session Modal
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [closeTargetId, setCloseTargetId] = useState(null);
+  const [closeError, setCloseError] = useState('');
+  const [closeLoading, setCloseLoading] = useState(false);
 
   // Socket setup
   useEffect(() => {
@@ -143,6 +150,7 @@ export default function Messages() {
 
   const activeList = tab === 'mine' ? mineSessions : queueSessions;
   const selectedSession = [...mineSessions, ...queueSessions].find((s) => s.id === selectedId) || null;
+  const closeTargetSession = [...mineSessions, ...queueSessions].find((s) => s.id === closeTargetId) || null;
 
   const filteredSessions = activeList.filter((s) => {
     const name = s.user?.fullName || s.guestName || `Khách hàng #${s.id}`;
@@ -162,14 +170,25 @@ export default function Messages() {
     }
   };
 
-  const handleClose = async (sessionId) => {
-    if (!confirm('Bạn có chắc chắn muốn đóng phiên hỗ trợ này?')) return;
+  const handleOpenClose = (sessionId) => {
+    setCloseTargetId(sessionId);
+    setCloseError('');
+    setCloseModalOpen(true);
+  };
+
+  const handleConfirmClose = async () => {
+    if (!closeTargetId) return;
     try {
-      await chatApi.closeSession(sessionId);
-      setSelectedId(null);
+      setCloseLoading(true);
+      setCloseError('');
+      await chatApi.closeSession(closeTargetId);
+      setCloseModalOpen(false);
+      if (selectedId === closeTargetId) setSelectedId(null);
       await fetchSessions();
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể đóng phiên chat');
+      setCloseError(err.response?.data?.message || 'Không thể đóng phiên chat');
+    } finally {
+      setCloseLoading(false);
     }
   };
 
@@ -336,7 +355,7 @@ export default function Messages() {
 
               {selectedSession.status === 'staff' && (
                 <button
-                  onClick={() => handleClose(selectedSession.id)}
+                  onClick={() => handleOpenClose(selectedSession.id)}
                   className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5 border border-rose-200"
                 >
                   <CheckCircle size={14} />
@@ -426,6 +445,55 @@ export default function Messages() {
           Chọn một phiên chat từ danh sách để bắt đầu trao đổi với khách hàng
         </div>
       )}
+
+      {/* Modal Xác Nhận Đóng Phiên Hỗ Trợ */}
+      <Modal open={closeModalOpen} onClose={() => setCloseModalOpen(false)} title="Kết Thúc Hỗ Trợ">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50/50 p-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-600" />
+            <div className="text-sm text-ink-soft">
+              <p className="font-medium text-ink">
+                Bạn có chắc chắn muốn đóng phiên hỗ trợ này?
+              </p>
+              {closeTargetSession && (
+                <p className="mt-1">
+                  Khách hàng:{' '}
+                  <strong>
+                    {closeTargetSession.user?.fullName ||
+                      closeTargetSession.guestName ||
+                      `Khách hàng #${closeTargetSession.id}`}
+                  </strong>{' '}
+                  • Phiên #{closeTargetSession.id}
+                </p>
+              )}
+              <p className="mt-2 text-xs text-rose-600">
+                Sau khi đóng, khách hàng sẽ không thể tiếp tục nhắn tin trong phiên này.
+              </p>
+            </div>
+          </div>
+
+          {closeError && <p className="text-xs text-clay">{closeError}</p>}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setCloseModalOpen(false)}
+              disabled={closeLoading}
+              className="px-4 py-2 text-sm rounded-lg border border-border text-ink-soft hover:bg-black/[0.03] focus-ring"
+            >
+              Quay lại
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmClose}
+              disabled={closeLoading}
+              className="px-4 py-2 text-sm rounded-lg bg-rose-600 text-white hover:bg-rose-700 focus-ring font-medium disabled:opacity-50"
+            >
+              {closeLoading ? 'Đang đóng...' : 'Xác nhận Kết thúc'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -36,6 +36,12 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ChatModule } from './chat/chat.module';
 import { ChatSession } from './chat/entities/chat-session.entity';
 import { ChatMessage } from './chat/entities/chat-message.entity';
+import { Table } from './tables/entities/table.entity';
+import { TablesModule } from './tables/tables.module';
+import { Order } from './orders/entities/order.entity';
+import { OrderItem } from './orders/entities/order-item.entity';
+import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
 
 
 const migrationsPath = path.join(__dirname, 'migrations', '*{.ts,.js}');
@@ -54,7 +60,7 @@ const migrationsPath = path.join(__dirname, 'migrations', '*{.ts,.js}');
         username: configService.get<string>('DB_USERNAME') || 'root',
         password: configService.get<string>('DB_PASSWORD') || 'quanvip2004',
         database: configService.get<string>('DB_NAME') || 'dola_restaurant',
-        entities: [User, Role, Category, Food, FoodImage, Review, ReviewReply, NewsCategory, News, NewsImage, Promotion, Reservation, Contact, ChatSession, ChatMessage],
+        entities: [User, Role, Category, Food, FoodImage, Review, ReviewReply, NewsCategory, News, NewsImage, Promotion, Reservation, Contact, ChatSession, ChatMessage, Table, Order, OrderItem],
         migrations: [migrationsPath],
         migrationsRun: true,
         synchronize: false,
@@ -73,6 +79,9 @@ const migrationsPath = path.join(__dirname, 'migrations', '*{.ts,.js}');
     ChatbotModule,
     DashboardModule,
     ChatModule,
+    TablesModule,
+    OrdersModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [

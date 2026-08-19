@@ -17,6 +17,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import VerifyCode from './pages/VerifyCode'
 import ResetPassword from './pages/ResetPassword'
 import Account from './pages/Account'
+import Order from './pages/Order'
 import { AuthProvider } from './context/AuthContext'
 import GuestRoute from './components/GuestRoute.jsx'
 import ChatbotWidget from './components/ChatbotWidget.jsx'
@@ -24,41 +25,52 @@ import ChatbotWidget from './components/ChatbotWidget.jsx'
 function App() {
   return (
     <AuthProvider>
-      <div className="flex min-h-screen flex-col">
-        <Header />
-        <main className="flex-1">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/gioi-thieu" element={<About />} />
+      <Routes>
+        {/* Trang đặt món tại bàn qua quét mã QR (không kèm Header/Footer chung của website) */}
+        <Route path="/order/:code" element={<Order />} />
 
-            <Route path="/thuc-don" element={<Menu />} />
-            <Route path="/thuc-don/:id" element={<FoodDetail />} />
+        {/* Các trang thông thường của website nhà hàng */}
+        <Route
+          path="*"
+          element={
+            <div className="flex min-h-screen flex-col">
+              <Header />
+              <main className="flex-1">
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/gioi-thieu" element={<About />} />
 
-            <Route path="/dat-ban" element={<Reservation />} />
+                  <Route path="/thuc-don" element={<Menu />} />
+                  <Route path="/thuc-don/:id" element={<FoodDetail />} />
 
-            <Route path="/khuyen-mai" element={<Promotions />} />
+                  <Route path="/dat-ban" element={<Reservation />} />
 
-            <Route path="/tin-tuc" element={<News />} />
-            <Route path="/tin-tuc/:slug" element={<NewsDetail />} />
+                  <Route path="/khuyen-mai" element={<Promotions />} />
 
-            <Route path="/lien-he" element={<Contact />} />
+                  <Route path="/tin-tuc" element={<News />} />
+                  <Route path="/tin-tuc/:slug" element={<NewsDetail />} />
 
-            <Route path="/dang-nhap" element={<GuestRoute><Login /></GuestRoute>} />
-            <Route path="/dang-ky" element={<GuestRoute><Register /></GuestRoute>} />
-            <Route path="/quen-mat-khau" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
-            <Route path="/xac-thuc-ma" element={<GuestRoute><VerifyCode /></GuestRoute>} />
-            <Route path="/dat-lai-mat-khau" element={<GuestRoute><ResetPassword /></GuestRoute>} />
-            <Route path="/tai-khoan" element={<Account />} />
+                  <Route path="/lien-he" element={<Contact />} />
 
-            <Route
-              path="*"
-              element={<PlaceholderPage title="Không tìm thấy trang" description="Trang bạn tìm không tồn tại." />}
-            />
-          </Routes>
-        </main>
-        <Footer />
-        <ChatbotWidget />
-      </div>
+                  <Route path="/dang-nhap" element={<GuestRoute><Login /></GuestRoute>} />
+                  <Route path="/dang-ky" element={<GuestRoute><Register /></GuestRoute>} />
+                  <Route path="/quen-mat-khau" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+                  <Route path="/xac-thuc-ma" element={<GuestRoute><VerifyCode /></GuestRoute>} />
+                  <Route path="/dat-lai-mat-khau" element={<GuestRoute><ResetPassword /></GuestRoute>} />
+                  <Route path="/tai-khoan" element={<Account />} />
+
+                  <Route
+                    path="*"
+                    element={<PlaceholderPage title="Không tìm thấy trang" description="Trang bạn tìm không tồn tại." />}
+                  />
+                </Routes>
+              </main>
+              <Footer />
+              <ChatbotWidget />
+            </div>
+          }
+        />
+      </Routes>
     </AuthProvider>
   )
 }

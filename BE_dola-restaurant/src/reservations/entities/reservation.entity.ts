@@ -51,11 +51,17 @@ export class Reservation {
   @Column({ name: 'party_size', type: 'int' })
   partySize: number;
 
-  // Số bàn/khu vực — hiện chưa có bảng quản lý bàn ăn riêng nên lưu dạng
-  // text tự do (khớp với field `table` đang dùng ở mock UI hiện tại).
-  // Khi có bảng Tables/RestaurantTable thật, có thể đổi thành FK sau.
   @Column({ name: 'table_number', type: 'varchar', nullable: true })
   tableNumber: string | null;
+
+  @Column({ name: 'table_id', type: 'int', nullable: true })
+  tableId: number | null;
+
+  // Dùng lazy arrow function () => Table để tránh circular import lúc compile,
+  // TypeORM sẽ resolve class sau khi cả 2 module đã load xong.
+  @ManyToOne(() => require('../../tables/entities/table.entity').Table, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'table_id' })
+  table: any | null;
 
   @Column({ name: 'reservation_date', type: 'date' })
   reservationDate: string;
@@ -91,6 +97,9 @@ export class Reservation {
 
   @Column({ name: 'cancelled_at', type: 'datetime', nullable: true })
   cancelledAt: Date | null;
+
+  @Column({ name: 'reminder_sent_at', type: 'datetime', nullable: true })
+  reminderSentAt: Date | null;
 
   // Liên kết tài khoản khách hàng nếu đặt bàn lúc đã đăng nhập — nullable vì
   // khách vãng lai (chưa đăng nhập) vẫn đặt được bình thường. Cột này chuẩn

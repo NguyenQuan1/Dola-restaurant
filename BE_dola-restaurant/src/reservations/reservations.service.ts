@@ -1,14 +1,18 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, In, Repository } from 'typeorm';
+import { Between, ILike, In, IsNull, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Reservation, ReservationCancelledBy, ReservationStatus } from './entities/reservation.entity';
+import { Order } from '../orders/entities/order.entity';
+import { Table } from '../tables/entities/table.entity';
 import {
   buildReservationCancelledMailHtml,
   buildReservationCancelledMailText,
   buildReservationConfirmedMailHtml,
   buildReservationConfirmedMailText,
+  buildReservationReminderMailHtml,
+  buildReservationReminderMailText,
   ReservationMailData,
 } from './templates/reservation-mail.template';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -18,6 +22,8 @@ export interface FindAllReservationsQuery {
   search?: string;
   status?: ReservationStatus;
   date?: string;
+  startDate?: string;
+  endDate?: string;
   page?: number;
   limit?: number;
 }
@@ -49,8 +55,12 @@ export class ReservationsService {
   constructor(
     @InjectRepository(Reservation)
     private readonly reservationRepo: Repository<Reservation>,
+    @InjectRepository(Table)
+    private readonly tableRepo: Repository<Table>,
+    @InjectRepository(Order)
+    private readonly orderRepo: Repository<Order>,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   async findAll(query: FindAllReservationsQuery = {}) {
     const page = Number(query.page) > 0 ? Number(query.page) : 1;
@@ -67,7 +77,11 @@ export class ReservationsService {
       where.status = query.status;
     }
     if (query.date) {
+      // Ưu tiên lọc theo đúng 1 ngày nếu có `date`.
       where.reservationDate = query.date;
+    } else if (query.startDate && query.endDate) {
+      // Lọc theo khoảng ngày (vd: dùng để tô các ngày có đơn trên lịch tháng).
+      where.reservationDate = Between(query.startDate, query.endDate);
     }
 
     const [items, total] = await this.reservationRepo.findAndCount({
@@ -95,12 +109,28 @@ export class ReservationsService {
     });
   }
 
+  private validateNotPastTime(reservationDate: string, reservationTime: string): void {
+    const [year, month, day] = reservationDate.split('-').map(Number);
+    const [hour, minute] = reservationTime.split(':').map(Number);
+    const targetDateTime = new Date(year, month - 1, day, hour || 0, minute || 0);
+
+    // Cho phép dung sai 1 phút để xử lý trễ trong lúc tạo form
+    if (targetDateTime.getTime() < Date.now() - 60 * 1000) {
+      throw new BadRequestException('Không thể đặt bàn vào thời gian trong quá khứ');
+    }
+  }
+
   // Dùng chung cho cả public form (khách tự đặt) và admin/staff tạo tay.
   // `allowInitialStatus`: false với public (luôn ép 'pending', bỏ qua
   // dto.initialStatus dù client gửi gì); true với admin (được chọn
   // pending/confirmed — mặc định 'confirmed' vì admin đã xác nhận trực
   // tiếp với khách qua điện thoại/tại quầy).
   async create(dto: CreateReservationDto, allowInitialStatus: boolean, userId?: number) {
+    const isAdminWalkIn = allowInitialStatus && dto.walkIn === true;
+    if (!isAdminWalkIn) {
+      this.validateNotPastTime(dto.reservationDate, dto.reservationTime);
+    }
+
     const status: ReservationStatus =
       allowInitialStatus && dto.initialStatus ? dto.initialStatus : allowInitialStatus ? 'confirmed' : 'pending';
 
@@ -138,7 +168,7 @@ export class ReservationsService {
       note: dto.note?.trim() || null,
       status,
       userId: userId || null,
-      confirmedAt: status === 'confirmed' ? new Date() : null,
+      confirmedAt: status === 'confirmed' || status === 'seated' ? new Date() : null,
     });
 
     const saved = await this.reservationRepo.save(reservation);
@@ -160,6 +190,12 @@ export class ReservationsService {
       throw new BadRequestException('Đơn đã kết thúc (hoàn thành/đã huỷ/không đến), không thể chỉnh sửa');
     }
 
+    const newDate = dto.reservationDate !== undefined ? dto.reservationDate : reservation.reservationDate;
+    const newTime = dto.reservationTime !== undefined ? dto.reservationTime : reservation.reservationTime;
+    if (dto.reservationDate !== undefined || dto.reservationTime !== undefined) {
+      this.validateNotPastTime(newDate, newTime);
+    }
+
     if (dto.customerName !== undefined) reservation.customerName = dto.customerName.trim();
     if (dto.phone !== undefined) reservation.phone = dto.phone.trim();
     if (dto.email !== undefined) reservation.email = dto.email?.trim() || null;
@@ -172,8 +208,61 @@ export class ReservationsService {
     return this.reservationRepo.save(reservation);
   }
 
+  // Đồng bộ trạng thái bàn liên kết với đơn đặt bàn.
+  // Khi đơn kết thúc (completed/cancelled/no_show): chỉ giải phóng bàn về
+  // 'available' nếu bàn đó không còn Order nào đang active — tránh reset
+  // nhầm khi khách vẫn đang gọi món mà chưa thanh toán.
+  private async syncTableStatus(reservation: Reservation): Promise<void> {
+    let table: Table | null = null;
+
+    if (reservation.tableId) {
+      table = await this.tableRepo.findOne({ where: { id: reservation.tableId } });
+    }
+    if (!table && reservation.id) {
+      table = await this.tableRepo.findOne({ where: { currentReservationId: reservation.id } });
+    }
+    if (!table && reservation.tableNumber) {
+      table = await this.tableRepo.findOne({ where: { code: reservation.tableNumber } });
+    }
+
+    if (!table) return;
+
+    if (['completed', 'cancelled', 'no_show'].includes(reservation.status)) {
+      // Kiểm tra xem bàn này còn Order active không trước khi giải phóng.
+      // Nếu còn order chưa thanh toán -> giữ bàn 'occupied', chỉ bỏ liên kết reservation.
+      const activeOrderCount = await this.orderRepo.count({
+        where: {
+          tableId: table.id,
+          status: In(['pending', 'confirmed', 'preparing', 'served']),
+        },
+      });
+
+      table.currentReservationId = null;
+      if (activeOrderCount === 0) {
+        // Không còn order nào -> trả bàn về trống
+        table.status = 'available';
+      }
+      // Nếu còn order active -> giữ nguyên status 'occupied', chỉ xoá liên kết reservation
+      await this.tableRepo.save(table);
+    } else if (reservation.status === 'seated') {
+      // Đã nhận bàn -> Bàn đang dùng
+      table.status = 'occupied';
+      table.currentReservationId = reservation.id;
+      await this.tableRepo.save(table);
+    } else if (reservation.status === 'confirmed') {
+      // Đã xác nhận -> Bàn đã đặt (nếu đang khả dụng)
+      if (table.status === 'available') {
+        table.status = 'reserved';
+      }
+      table.currentReservationId = reservation.id;
+      await this.tableRepo.save(table);
+    }
+  }
+
   // Đổi trạng thái vận hành (KHÔNG dùng để huỷ — xem cancel() bên dưới).
   // pending -> confirmed sẽ tự gửi mail xác nhận đầy đủ thông tin cho khách.
+  // seated -> completed bị chặn nếu bàn vẫn còn Order active chưa thanh toán
+  // (admin phải checkout order trước, lúc đó reservation tự chuyển completed).
   async changeStatus(id: number, nextStatus: Exclude<ReservationStatus, 'pending' | 'cancelled'>) {
     const reservation = await this.findOne(id);
 
@@ -188,12 +277,32 @@ export class ReservationsService {
       );
     }
 
+    // Chặn chuyển sang 'completed' thủ công nếu bàn đang có Order active.
+    // Trường hợp này admin phải checkout order trước — Order service sẽ tự
+    // set reservation về 'completed' khi thanh toán xong.
+    if (nextStatus === 'completed' && reservation.tableId) {
+      const activeOrderCount = await this.orderRepo.count({
+        where: {
+          tableId: reservation.tableId,
+          status: In(['pending', 'confirmed', 'preparing', 'served']),
+        },
+      });
+      if (activeOrderCount > 0) {
+        throw new BadRequestException(
+          'Bàn này vẫn còn hoá đơn chưa thanh toán. Vui lòng thanh toán hoá đơn trước khi hoàn thành đặt bàn.',
+        );
+      }
+    }
+
     reservation.status = nextStatus;
     if (nextStatus === 'confirmed') {
       reservation.confirmedAt = new Date();
     }
 
     const saved = await this.reservationRepo.save(reservation);
+
+    // Đồng bộ trạng thái bàn liên kết
+    await this.syncTableStatus(saved);
 
     if (nextStatus === 'confirmed') {
       // KHÔNG await — gửi mail không nên chặn phản hồi cho admin.
@@ -256,6 +365,9 @@ export class ReservationsService {
 
     const saved = await this.reservationRepo.save(reservation);
 
+    // Đồng bộ trạng thái bàn liên kết
+    await this.syncTableStatus(saved);
+
     void this.sendReservationMail(saved, 'cancelled');
 
     return saved;
@@ -265,6 +377,39 @@ export class ReservationsService {
     const reservation = await this.findOne(id);
     await this.reservationRepo.remove(reservation);
     return { success: true };
+  }
+
+  async sendUpcomingReservationReminders(): Promise<{ sentCount: number }> {
+    const upcomingReservations = await this.reservationRepo.find({
+      where: {
+        status: In(['pending', 'confirmed']),
+        reminderSentAt: IsNull(),
+      },
+    });
+
+    let sentCount = 0;
+    const now = new Date();
+
+    for (const res of upcomingReservations) {
+      if (!res.email || !res.email.trim()) continue;
+
+      const [year, month, day] = res.reservationDate.split('-').map(Number);
+      const [hour, minute] = res.reservationTime.split(':').map(Number);
+      const reservationDateTime = new Date(year, month - 1, day, hour || 0, minute || 0);
+
+      const diffMs = reservationDateTime.getTime() - now.getTime();
+      const fourHoursMs = 4 * 60 * 60 * 1000;
+
+      // Gửi nhắc nhở nếu thời gian hẹn sắp đến trong vòng 4 tiếng (0 < diffMs <= 4 giờ)
+      if (diffMs > 0 && diffMs <= fourHoursMs) {
+        await this.sendReservationMail(res, 'reminder');
+        res.reminderSentAt = new Date();
+        await this.reservationRepo.save(res);
+        sentCount++;
+      }
+    }
+
+    return { sentCount };
   }
 
   private toMailData(reservation: Reservation): ReservationMailData {
@@ -281,7 +426,7 @@ export class ReservationsService {
     };
   }
 
-  private async sendReservationMail(reservation: Reservation, type: 'confirmed' | 'cancelled') {
+  private async sendReservationMail(reservation: Reservation, type: 'confirmed' | 'cancelled' | 'reminder') {
     if (!reservation.email) {
       this.logger.log(`Đặt bàn #${reservation.id} không có email, bỏ qua gửi mail ${type}`);
       return;
@@ -292,15 +437,23 @@ export class ReservationsService {
       const from = this.configService.get<string>('MAIL_FROM') || 'Dola Restaurant <noreply@dola.local>';
       const data = this.toMailData(reservation);
 
-      const subject =
-        type === 'confirmed'
-          ? `✅ Xác nhận đặt bàn tại Dola Restaurant - ${reservation.reservationDate}`
-          : `❌ Đặt bàn tại Dola Restaurant đã bị huỷ - ${reservation.reservationDate}`;
+      let subject = '';
+      let text = '';
+      let html = '';
 
-      const text =
-        type === 'confirmed' ? buildReservationConfirmedMailText(data) : buildReservationCancelledMailText(data);
-      const html =
-        type === 'confirmed' ? buildReservationConfirmedMailHtml(data) : buildReservationCancelledMailHtml(data);
+      if (type === 'confirmed') {
+        subject = `✅ Xác nhận đặt bàn tại Dola Restaurant - ${reservation.reservationDate}`;
+        text = buildReservationConfirmedMailText(data);
+        html = buildReservationConfirmedMailHtml(data);
+      } else if (type === 'cancelled') {
+        subject = `❌ Đặt bàn tại Dola Restaurant đã bị huỷ - ${reservation.reservationDate}`;
+        text = buildReservationCancelledMailText(data);
+        html = buildReservationCancelledMailHtml(data);
+      } else if (type === 'reminder') {
+        subject = `⏰ [Nhắc nhở] Lịch đặt bàn tại Dola Restaurant lúc ${reservation.reservationTime.slice(0, 5)} ngày ${reservation.reservationDate}`;
+        text = buildReservationReminderMailText(data);
+        html = buildReservationReminderMailHtml(data);
+      }
 
       await transporter.sendMail({
         from,

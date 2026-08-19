@@ -118,12 +118,12 @@ export class FoodsController {
   }
 
   // Sắp xếp lại thứ tự hiển thị của các ảnh (kéo-thả ở frontend).
-  @Patch(':id/images/reorder')
-  @Roles('admin')
-  reorderImages(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: ReorderImagesDto,
-  ) {
-    return this.foodsService.reorderImages(id, dto);
-  }
+  // @Patch(':id/images/reorder')
+  // @Roles('admin')
+  // reorderImages(
+  //   @Param('id', ParseIntPipe) id: number,
+  //   @Body() dto: ReorderImagesDto,
+  // ) {
+  //   return this.foodsService.reorderImages(id, dto);
+  // }
 }

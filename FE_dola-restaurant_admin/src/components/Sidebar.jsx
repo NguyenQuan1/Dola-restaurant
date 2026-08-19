@@ -4,6 +4,7 @@ import {
   Layers,
   UtensilsCrossed,
   CalendarCheck,
+  Armchair,
   Users,
   UserCog,
   Tag,
@@ -11,6 +12,7 @@ import {
   Star,
   MessageCircle,
   Mail,
+  ShoppingBag,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -19,6 +21,8 @@ const nav = [
   { to: '/danh-muc', label: 'Danh mục', icon: Layers, roles: ['admin', 'staff'] },
   { to: '/mon-an', label: 'Món ăn', icon: UtensilsCrossed, roles: ['admin', 'staff'] },
   { to: '/dat-ban', label: 'Đặt bàn', icon: CalendarCheck, roles: ['admin', 'staff'] },
+  { to: '/quan-ly-ban', label: 'Quản lý bàn', icon: Armchair, roles: ['admin', 'staff'] },
+  { to: '/dat-mon&thanh-toan', label: 'Đặt món & Thanh toán', icon: ShoppingBag, roles: ['admin', 'staff'] },
   { to: '/khach-hang', label: 'Khách hàng', icon: Users, roles: ['admin'] },
   { to: '/nhan-vien', label: 'Nhân viên', icon: UserCog, roles: ['admin'] },
   { to: '/khuyen-mai', label: 'Khuyến mãi', icon: Tag, roles: ['admin'] },
