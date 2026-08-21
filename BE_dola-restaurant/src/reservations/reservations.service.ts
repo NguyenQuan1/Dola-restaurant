@@ -476,19 +476,32 @@ export class ReservationsService {
   private getTransporter(): nodemailer.Transporter {
     if (this.transporter) return this.transporter;
 
-    const user = this.configService.get<string>('MAIL_USER');
-    const pass = this.configService.get<string>('MAIL_PASS');
+    const user = this.configService.get<string>('MAIL_USER')?.trim();
+    const rawPass = this.configService.get<string>('MAIL_PASS')?.trim();
+    const pass = rawPass ? rawPass.replace(/\s+/g, '') : undefined;
+    const host = this.configService.get<string>('MAIL_HOST') || 'smtp.gmail.com';
+    const port = Number(this.configService.get<string>('MAIL_PORT') || (host === 'smtp.gmail.com' ? 465 : 587));
+
     if (!user || !pass) {
       throw new Error('Thiếu cấu hình gửi mail: vui lòng đặt MAIL_USER và MAIL_PASS trong biến môi trường');
     }
 
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('MAIL_HOST') || 'smtp.gmail.com',
-      port: Number(this.configService.get<string>('MAIL_PORT') || 587),
-      secure: false,
-      pool: true,
-      auth: { user, pass },
-    });
+    if (host === 'smtp.gmail.com') {
+      this.transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user, pass },
+      });
+    } else {
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+        tls: {
+          rejectUnauthorized: false,
+        },
+      });
+    }
 
     return this.transporter;
   }
