@@ -133,40 +133,42 @@ export class FoodsService {
 
     if (dto.images && dto.images.length > 0) {
       const images = await this.saveImageUrls(saved.id, dto.images);
-      saved.thumbnailUrl = images[0].imageUrl;
-      await this.foodRepo.save(saved);
-      saved.images = images;
+      await this.foodRepo.update(saved.id, { thumbnailUrl: images[0].imageUrl });
     }
 
-    return saved;
+    return this.findOne(saved.id);
   }
 
   async update(id: number, dto: UpdateFoodDto) {
-    const food = await this.findOne(id);
+    const food = await this.foodRepo.findOne({ where: { id } });
+    if (!food) throw new NotFoundException('Không tìm thấy món ăn');
+
+    const updatePayload: Partial<Food> = {};
 
     if (dto.name && dto.name.trim() !== food.name) {
-      food.slug = await this.generateUniqueSlug(dto.name, id);
-      food.name = dto.name.trim();
+      updatePayload.slug = await this.generateUniqueSlug(dto.name, id);
+      updatePayload.name = dto.name.trim();
     }
     if (dto.categoryId !== undefined) {
-      food.categoryId = dto.categoryId;
-      food.category = { id: dto.categoryId } as Category;
+      updatePayload.categoryId = dto.categoryId;
     }
-    if (dto.price !== undefined) food.price = dto.price;
-    if (dto.description !== undefined) food.description = dto.description?.trim() || null;
-    if (dto.ingredients !== undefined) food.ingredients = dto.ingredients?.trim() || null;
-    if (dto.isActive !== undefined) food.isActive = dto.isActive;
-    if (dto.isFeatured !== undefined) food.isFeatured = dto.isFeatured;
+    if (dto.price !== undefined) updatePayload.price = dto.price;
+    if (dto.description !== undefined) updatePayload.description = dto.description?.trim() || null;
+    if (dto.ingredients !== undefined) updatePayload.ingredients = dto.ingredients?.trim() || null;
+    if (dto.isActive !== undefined) updatePayload.isActive = dto.isActive;
+    if (dto.isFeatured !== undefined) updatePayload.isFeatured = dto.isFeatured;
 
-    await this.foodRepo.save(food);
+    if (Object.keys(updatePayload).length > 0) {
+      await this.foodRepo.update(id, updatePayload);
+    }
     return this.findOne(id);
   }
 
   async toggleStatus(id: number) {
-    const food = await this.findOne(id);
-    food.isActive = !food.isActive;
-    await this.foodRepo.save(food);
-    return food;
+    const food = await this.foodRepo.findOne({ where: { id } });
+    if (!food) throw new NotFoundException('Không tìm thấy món ăn');
+    await this.foodRepo.update(id, { isActive: !food.isActive });
+    return this.findOne(id);
   }
 
   async remove(id: number) {
@@ -203,7 +205,8 @@ export class FoodsService {
   // -------------------------------------------------------------------
 
   async addImages(foodId: number, dto: AddImagesDto) {
-    const food = await this.findOne(foodId);
+    const food = await this.foodRepo.findOne({ where: { id: foodId } });
+    if (!food) throw new NotFoundException('Không tìm thấy món ăn');
     if (!dto.images || dto.images.length === 0) {
       throw new BadRequestException('Chưa có ảnh nào được gửi lên');
     }
@@ -211,8 +214,7 @@ export class FoodsService {
     const images = await this.saveImageUrls(food.id, dto.images);
 
     if (!food.thumbnailUrl) {
-      food.thumbnailUrl = images[0].imageUrl;
-      await this.foodRepo.save(food);
+      await this.foodRepo.update(food.id, { thumbnailUrl: images[0].imageUrl });
     }
 
     return this.findOne(food.id);
@@ -236,34 +238,30 @@ export class FoodsService {
   }
 
   async removeImage(foodId: number, imageId: number) {
-    const food = await this.findOne(foodId);
     const image = await this.foodImageRepo.findOne({ where: { id: imageId, foodId } });
     if (!image) throw new NotFoundException('Không tìm thấy ảnh này trong món ăn');
 
-    // Chỉ xóa bản ghi trong DB. Nếu muốn xóa luôn file trên Uploadcare, cần
-    // gọi Uploadcare REST API (Delete file) bằng secret key ở phía server —
-    // có thể bổ sung sau nếu bạn cần tiết kiệm dung lượng lưu trữ Uploadcare.
-    await this.foodImageRepo.remove(image);
+    await this.foodImageRepo.delete({ id: imageId, foodId });
 
-    if (food.thumbnailUrl === image.imageUrl) {
+    const food = await this.foodRepo.findOne({ where: { id: foodId } });
+    if (food && food.thumbnailUrl === image.imageUrl) {
       const remaining = await this.foodImageRepo.findOne({
         where: { foodId },
         order: { sortOrder: 'ASC' },
       });
-      food.thumbnailUrl = remaining ? remaining.imageUrl : null;
-      await this.foodRepo.save(food);
+      await this.foodRepo.update(foodId, {
+        thumbnailUrl: remaining ? remaining.imageUrl : null,
+      });
     }
 
     return this.findOne(foodId);
   }
 
   async setThumbnail(foodId: number, imageId: number) {
-    const food = await this.findOne(foodId);
     const image = await this.foodImageRepo.findOne({ where: { id: imageId, foodId } });
     if (!image) throw new NotFoundException('Không tìm thấy ảnh này trong món ăn');
 
-    food.thumbnailUrl = image.imageUrl;
-    await this.foodRepo.save(food);
+    await this.foodRepo.update(foodId, { thumbnailUrl: image.imageUrl });
     return this.findOne(foodId);
   }
 

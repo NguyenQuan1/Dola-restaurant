@@ -10,7 +10,7 @@ import QRCode from 'qrcode'
  * vì mã bàn (code) không đổi.
  */
 export function buildTableOrderUrl(code) {
-    const customerBaseUrl = import.meta.env.VITE_CUSTOMER_APP_URL || 'http://localhost:5173'
+    const customerBaseUrl = import.meta.env.VITE_CUSTOMER_APP_URL || 'https://dola-restaurant-psi.vercel.app'
     return `${customerBaseUrl}/order/${code}`
 }
 
