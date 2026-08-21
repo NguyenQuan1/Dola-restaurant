@@ -145,11 +145,13 @@ export class AuthService {
         message: 'Mã đặt lại đã được gửi đến email.',
         ...(this.isDevelopment() ? { code } : {}),
       };
-    } catch (error) {
-      console.warn('Việc gửi thư đã thất bại, mã đặt lại được tạo cho mục đích phát triển:', code);
+    } catch (error: any) {
+      this.logger.error(
+        `[ForgotPassword] Gửi mail thất bại cho ${dto.email}: ${error?.message || error}`,
+        error?.stack,
+      );
       return {
-        message: 'Mã đặt lại đã được tạo. Cấu hình SMTP để gửi thư.',
-        ...(this.isDevelopment() ? { code } : {}),
+        message: 'Không thể gửi mail đặt lại mật khẩu. Vui lòng thử lại sau.',
       };
     }
   }
