@@ -37,14 +37,26 @@ export class MailService {
       this.configService.get<string>('MAIL_FROM') ||
       'Dola Restaurant <onboarding@resend.dev>';
 
-    const { error } = await client.emails.send({
+    const payload: any = {
       from,
       to: Array.isArray(options.to) ? options.to : [options.to],
       subject: options.subject,
-      ...(options.text ? { text: options.text } : {}),
-      ...(options.html ? { html: options.html } : {}),
-      ...(options.bcc && options.bcc.length > 0 ? { bcc: options.bcc } : {}),
-    });
+    };
+
+    if (options.html) {
+      payload.html = options.html;
+    }
+    if (options.text) {
+      payload.text = options.text;
+    }
+    if (!options.html && !options.text) {
+      payload.text = '';
+    }
+    if (options.bcc && options.bcc.length > 0) {
+      payload.bcc = options.bcc;
+    }
+
+    const { error } = await client.emails.send(payload);
 
     if (error) {
       throw new Error(`Resend API lỗi: ${error.message}`);
