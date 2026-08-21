@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { verifyCode } from '../api/auth'
+import { useLanguage } from '../context/LanguageContext'
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 24 },
@@ -13,8 +14,8 @@ const staggerContainer = {
   visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
 }
 
-function StepIndicator({ step }) {
-  const steps = ['Gửi mã', 'Xác thực', 'Đổi mật khẩu']
+function StepIndicator({ step, t }) {
+  const steps = [t('auth.stepSendCode'), t('auth.stepVerify'), t('auth.stepReset')]
   return (
     <div className="mx-auto mt-6 flex max-w-xs items-center justify-center gap-2">
       {steps.map((label, i) => {
@@ -47,6 +48,7 @@ function StepIndicator({ step }) {
 export default function VerifyCode() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [email, setEmail] = useState(location.state?.email || '')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
@@ -56,7 +58,7 @@ export default function VerifyCode() {
   const handleVerify = async (e) => {
     e.preventDefault()
     if (!email.trim() || !code.trim()) {
-      setError('Vui lòng nhập email và mã xác thực')
+      setError(t('auth.errFillFields'))
       return
     }
 
@@ -66,7 +68,7 @@ export default function VerifyCode() {
       await verifyCode({ email, code })
       navigate('/dat-lai-mat-khau', { state: { email, code } })
     } catch (err) {
-      const message = err?.response?.data?.message || 'Mã xác thực không đúng hoặc đã hết hạn'
+      const message = err?.response?.data?.message || t('common.error')
       setError(message)
     } finally {
       setLoading(false)
@@ -88,15 +90,19 @@ export default function VerifyCode() {
         className="relative z-10 mx-auto w-full max-w-md px-6"
       >
         <motion.div variants={fadeInUp} className="text-center">
-          <span className="font-script text-lg italic tracking-widest text-gold-dark">Xác thực tài khoản</span>
-          <h1 className="mt-2 font-display text-3xl font-semibold text-jade-700">Nhập mã xác thực</h1>
+          <span className="font-script text-lg italic tracking-widest text-gold-dark">
+            {t('auth.verifySubtitle')}
+          </span>
+          <h1 className="mt-2 font-display text-3xl font-semibold text-jade-700">
+            {t('auth.verifyTitle')}
+          </h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-            Mã 6 số đã được gửi tới email của bạn. Vui lòng nhập đúng mã để tiếp tục.
+            {t('auth.verifyDesc')}
           </p>
         </motion.div>
 
         <motion.div variants={fadeInUp}>
-          <StepIndicator step={2} />
+          <StepIndicator step={2} t={t} />
         </motion.div>
 
         <motion.div variants={fadeInUp} className="mt-8 rounded-xl2 bg-ivory-deep p-8 shadow-card">
@@ -114,17 +120,17 @@ export default function VerifyCode() {
               )}
             </AnimatePresence>
             <div>
-              <label className="text-xs font-medium text-ink-soft">Email</label>
+              <label className="text-xs font-medium text-ink-soft">{t('auth.emailOrPhone')}</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-sm outline-none focus:border-gold"
-                placeholder="ban@email.com"
+                placeholder={t('auth.emailPlaceholder')}
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-ink-soft">Mã xác thực</label>
+              <label className="text-xs font-medium text-ink-soft">{t('auth.verifyTitle')}</label>
               <motion.input
                 animate={focused ? { scale: 1.01, borderColor: 'rgb(201 151 63)' } : { scale: 1 }}
                 transition={{ duration: 0.2 }}
@@ -133,7 +139,7 @@ export default function VerifyCode() {
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 className="mt-1 w-full rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-center text-lg tracking-[0.4em] outline-none focus:border-gold"
-                placeholder="123456"
+                placeholder={t('auth.codePlaceholder')}
                 maxLength={6}
               />
             </div>
@@ -143,12 +149,12 @@ export default function VerifyCode() {
                 disabled={loading}
                 className="w-full rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3 text-[15px] font-semibold text-jade-900 shadow-gold transition-transform disabled:opacity-60"
               >
-                {loading ? 'Đang xác thực...' : 'Tiếp tục'}
+                {loading ? t('auth.verifying') : t('auth.verifyBtn')}
               </button>
             </motion.div>
             <p className="text-center text-sm text-ink-soft">
               <Link to="/dang-nhap" className="font-semibold text-jade-700 hover:underline">
-                ← Về đăng nhập
+                ← {t('auth.backToLogin')}
               </Link>
             </p>
           </form>

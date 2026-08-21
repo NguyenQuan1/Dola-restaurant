@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
@@ -16,10 +18,23 @@ body {
 }
 
 /* subtle scrollbar for the data-dense admin */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #E6DECB; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #D8CEB2; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E6DECB;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D8CEB2;
+}
 
 .focus-ring {
   @apply outline-none ring-2 ring-saffron/60 ring-offset-2 ring-offset-paper;
@@ -28,4 +43,31 @@ body {
 /* Đồng bộ chữ Playfair Display cho tiêu đề, giống dola-restaurant */
 .font-display {
   letter-spacing: -0.01em;
+}
+
+/* ============================================================
+   FIX: Khi in (Ctrl+P / window.print), chỉ hiển thị hóa đơn
+   (#printable-receipt), ẩn toàn bộ phần còn lại của trang
+   (sidebar, bảng lịch sử, header, modal...).
+   ============================================================ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-receipt,
+  #printable-receipt * {
+    visibility: visible;
+  }
+
+  #printable-receipt {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  @page {
+    margin: 0.5cm;
+  }
 }

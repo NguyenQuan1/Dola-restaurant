@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import promotionService from '../api/promotions'
+import { useLanguage } from '../context/LanguageContext'
 
 const formatDiscount = (promo) => {
   if (promo.discountType === 'fixed') {
@@ -32,8 +33,7 @@ const daysUntil = (dateStr) => {
   return Math.round((end - today) / 86400000)
 }
 
-// Cấu hình animation dùng chung — cùng "ngôn ngữ" chuyển động với About.jsx
-// để các trang trong site nhất quán với nhau.
+// Cấu hình animation dùng chung
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },
   visible: {
@@ -51,8 +51,6 @@ const staggerContainer = {
   },
 }
 
-// Card bay vào từ trái/phải xen kẽ, hơi nghiêng rồi chỉnh thẳng lại —
-// sinh động hơn fadeInUp thuần nhưng vẫn dùng cùng easing "back" như About.
 const cardVariant = (fromLeft) => ({
   hidden: { opacity: 0, x: fromLeft ? -60 : 60, rotate: fromLeft ? -4 : 4, scale: 0.92 },
   visible: {
@@ -64,8 +62,6 @@ const cardVariant = (fromLeft) => ({
   },
 })
 
-// Con dấu giảm giá "đóng dấu" xuống bằng spring — tạo cảm giác nảy thật,
-// khác kiểu với card để mỗi phần một điểm nhấn riêng.
 const stampVariant = {
   hidden: { opacity: 0, scale: 0.3, rotate: -25 },
   visible: {
@@ -93,7 +89,7 @@ function CheckIcon() {
   )
 }
 
-function PromoCard({ promo, index, copied, onCopy }) {
+function PromoCard({ promo, index, copied, onCopy, t }) {
   const timeRange = formatTimeRange(promo.startTime, promo.endTime)
   const left = daysUntil(promo.endDate)
   const isSoon = left !== null && left >= 0 && left <= 3
@@ -134,7 +130,7 @@ function PromoCard({ promo, index, copied, onCopy }) {
             {formatDiscount(promo)}
           </span>
           <span className="mt-0.5 text-[8px] font-bold uppercase tracking-wide text-gold-dark">
-            giảm
+            OFF
           </span>
         </motion.div>
       </div>
@@ -145,18 +141,18 @@ function PromoCard({ promo, index, copied, onCopy }) {
         <span className="absolute right-0 top-0 h-6 w-6 -translate-y-1/2 translate-x-1/2 rounded-full bg-ivory" />
       </div>
 
-      {/* CUỐNG VÉ: hạn dùng + mã */}
+      {/* CUỐNG VÉ */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
         <div className="text-xs text-gold-dark">
-          <p>Hạn sử dụng: {formatDate(promo.endDate)}</p>
-          {timeRange && <p className="mt-0.5">Khung giờ áp dụng: {timeRange}</p>}
+          <p>{t('promotions.validUntil')}: {formatDate(promo.endDate)}</p>
+          {timeRange && <p className="mt-0.5">{t('promotions.applicableHours')}: {timeRange}</p>}
           {isSoon && (
             <motion.p
               animate={{ opacity: [1, 0.4, 1] }}
               transition={{ duration: 1.4, repeat: Infinity }}
               className="mt-1 font-semibold text-red-500"
             >
-              {left === 0 ? 'Hết hạn hôm nay' : `Còn ${left} ngày`}
+              {left === 0 ? t('promotions.endsToday') : t('promotions.daysLeft', { days: left })}
             </motion.p>
           )}
         </div>
@@ -181,7 +177,7 @@ function PromoCard({ promo, index, copied, onCopy }) {
                   className="flex items-center gap-1.5"
                 >
                   <CheckIcon />
-                  Đã sao chép
+                  {t('promotions.copied')}
                 </motion.span>
               ) : (
                 <motion.span
@@ -223,6 +219,7 @@ function SkeletonCard() {
 }
 
 export default function Promotions() {
+  const { t } = useLanguage()
   const [promotions, setPromotions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -239,7 +236,7 @@ export default function Promotions() {
         const res = await promotionService.getPublic({ limit: 200 })
         if (!ignore) setPromotions(res.items ?? res)
       } catch (err) {
-        if (!ignore) setError(err?.response?.data?.message || 'Có lỗi khi tải khuyến mãi')
+        if (!ignore) setError(err?.response?.data?.message || t('common.error'))
       } finally {
         if (!ignore) setLoading(false)
       }
@@ -274,7 +271,7 @@ export default function Promotions() {
     setTimeout(() => setCopied(''), 1500)
   }
 
-  const filterOptions = [{ value: 'all', label: 'Tất cả' }, ...types.map((t) => ({ value: t, label: t }))]
+  const filterOptions = [{ value: 'all', label: t('promotions.filterAll') }, ...types.map((tp) => ({ value: tp, label: tp }))]
 
   return (
     <>
@@ -288,7 +285,6 @@ export default function Promotions() {
         <div className="pointer-events-none absolute -right-16 top-0 h-64 w-64 rounded-full bg-gold-light/10 blur-3xl" />
         <div className="pointer-events-none absolute -left-16 bottom-0 h-56 w-56 rounded-full bg-gold-light/10 blur-3xl" />
 
-        {/* Vài đốm sáng bồng bềnh phía sau tiêu đề, tạo chút lấp lánh cho khu vực khuyến mãi */}
         {[0, 1, 2].map((i) => (
           <motion.span
             key={i}
@@ -300,17 +296,21 @@ export default function Promotions() {
         ))}
 
         <motion.div variants={fadeInUp} className="relative mx-auto max-w-2xl px-6">
-          <span className="font-script text-lg italic tracking-widest text-gold-light">Ưu đãi hấp dẫn</span>
-          <h1 className="mt-3 font-display text-4xl font-semibold text-ivory">Khuyến mãi</h1>
+          <span className="font-script text-lg italic tracking-widest text-gold-light">
+            {t('promotions.eyebrow')}
+          </span>
+          <h1 className="mt-3 font-display text-4xl font-semibold text-ivory">
+            {t('promotions.title')}
+          </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-ivory/75">
-            Tổng hợp voucher, combo, flash sale và ưu đãi dành riêng cho khách hàng của Dola Restaurant.
+            {t('promotions.subtitle')}
           </p>
         </motion.div>
       </motion.section>
 
       <section className="bg-ivory py-16">
         <div className="mx-auto max-w-6xl px-6 lg:px-10">
-          {/* BỘ LỌC THEO LOẠI — pill trượt bằng layoutId, tự động animate khi đổi tab */}
+          {/* BỘ LỌC THEO LOẠI */}
           {!loading && !error && types.length > 1 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -355,14 +355,14 @@ export default function Promotions() {
               animate={{ opacity: 1 }}
               className="rounded-xl2 bg-ivory-deep py-16 text-center text-ink-soft"
             >
-              Hiện chưa có chương trình khuyến mãi nào đang diễn ra. Quay lại sau nhé!
+              {t('promotions.noPromos')}
             </motion.div>
           )}
 
           {!loading && !error && filtered.length > 0 && (
             <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
               {filtered.map((promo, i) => (
-                <PromoCard key={promo.id} promo={promo} index={i} copied={copied} onCopy={handleCopy} />
+                <PromoCard key={promo.id} promo={promo} index={i} copied={copied} onCopy={handleCopy} t={t} />
               ))}
             </div>
           )}
@@ -375,9 +375,9 @@ export default function Promotions() {
             transition={{ duration: 0.7 }}
             className="mt-16 rounded-xl2 bg-jade-700 p-10 text-center text-ivory"
           >
-            <h3 className="font-display text-2xl font-semibold">Sẵn sàng thưởng thức?</h3>
+            <h3 className="font-display text-2xl font-semibold">{t('home.hero.titlePart1')}</h3>
             <p className="mt-2 text-ivory/75">
-              Sử dụng mã khuyến mãi khi đặt món online hoặc đọc mã cho nhân viên khi đặt bàn.
+              {t('promotions.subtitle')}
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-4">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }} className="inline-block">
@@ -385,7 +385,7 @@ export default function Promotions() {
                   to="/dat-ban"
                   className="inline-flex rounded-full bg-gradient-to-r from-gold-dark to-gold px-7 py-3 text-sm font-semibold text-jade-900 shadow-gold transition-shadow duration-300 hover:shadow-lg"
                 >
-                  Đặt bàn ngay
+                  {t('nav.bookTable')}
                 </Link>
               </motion.div>
             </div>

@@ -3,9 +3,20 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import newsService from '../api/news'
 import PlaceholderPage from '../components/PlaceholderPage'
+import { useLanguage } from '../context/LanguageContext'
 
-const formatDate = (d) =>
-  d ? new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
+const formatDate = (d, lang = 'vi') => {
+  if (!d) return ''
+  try {
+    return new Date(d).toLocaleDateString(lang === 'en' ? 'en-US' : lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : lang === 'ko' ? 'ko-KR' : 'vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  } catch {
+    return ''
+  }
+}
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 30 },
@@ -27,6 +38,7 @@ const staggerContainer = {
 export default function NewsDetail() {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const { t, language } = useLanguage()
 
   const [news, setNews] = useState(null)
   const [related, setRelated] = useState([])
@@ -75,7 +87,7 @@ export default function NewsDetail() {
   }
 
   if (notFound || !news) {
-    return <PlaceholderPage title="Không tìm thấy bài viết" description="Bài viết bạn tìm không tồn tại." />
+    return <PlaceholderPage title={t('newsDetail.notFoundTitle')} description={t('newsDetail.notFoundDesc')} />
   }
 
   const paragraphs = typeof news.content === 'string'
@@ -92,8 +104,8 @@ export default function NewsDetail() {
       >
         {/* Điều hướng */}
         <motion.nav variants={fadeInUp} className="text-xs text-ink-soft">
-          <Link to="/" className="hover:text-jade-700">Trang chủ</Link> /{' '}
-          <Link to="/tin-tuc" className="hover:text-jade-700">Tin tức</Link> /{' '}
+          <Link to="/" className="hover:text-jade-700">{t('newsDetail.breadcrumbHome')}</Link> /{' '}
+          <Link to="/tin-tuc" className="hover:text-jade-700">{t('newsDetail.breadcrumbNews')}</Link> /{' '}
           <span className="text-jade-700">{news.title}</span>
         </motion.nav>
 
@@ -102,7 +114,7 @@ export default function NewsDetail() {
           {news.category && (
             <span className="rounded-full bg-gold/15 px-3 py-1 font-semibold text-gold-dark">{news.category}</span>
           )}
-          <span className="text-ink-soft">{formatDate(news.publishedAt)}</span>
+          <span className="text-ink-soft">{formatDate(news.publishedAt, language)}</span>
         </motion.div>
 
         {/* Tiêu đề */}
@@ -110,7 +122,7 @@ export default function NewsDetail() {
           {news.title}
         </motion.h1>
 
-        {/* Hình ảnh chính bài viết phát triển kèm scale phóng rộng mượt */}
+        {/* Hình ảnh chính bài viết */}
         {news.image && (
           <motion.div 
             initial={{ opacity: 0, scale: 0.96, y: 20 }}
@@ -134,24 +146,26 @@ export default function NewsDetail() {
           }
         </motion.div>
 
-        {/* Hàng nút bấm kêu gọi đặt bàn */}
+        {/* Hàng nút bấm */}
         <motion.div variants={fadeInUp} className="mt-10 flex flex-wrap gap-4 border-t border-jade-700/10 pt-8">
           <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
             <Link to="/dat-ban" className="inline-block rounded-full bg-jade-700 px-6 py-3 text-sm font-semibold text-ivory hover:bg-jade-600 shadow-sm transition-colors">
-              Đặt bàn ngay
+              {t('nav.bookTable')}
             </Link>
           </motion.div>
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Link to="/tin-tuc" className="inline-block rounded-full border border-jade-700/25 px-6 py-3 text-sm font-semibold text-jade-700 hover:bg-jade-50 transition-colors">
-              ← Xem thêm tin tức
+              {t('newsDetail.backToNews')}
             </Link>
           </motion.div>
         </motion.div>
 
-        {/* Bài viết liên quan xuất hiện theo hàng ngang stagger */}
+        {/* Bài viết liên quan */}
         {related.length > 0 && (
           <div className="mt-16">
-            <motion.h2 variants={fadeInUp} className="font-display text-xl font-semibold text-jade-700">Bài viết liên quan</motion.h2>
+            <motion.h2 variants={fadeInUp} className="font-display text-xl font-semibold text-jade-700">
+              {t('newsDetail.relatedNews')}
+            </motion.h2>
             <motion.div 
               initial="hidden"
               whileInView="visible"
@@ -169,7 +183,7 @@ export default function NewsDetail() {
                     <div className="h-32 overflow-hidden bg-jade-700/10">
                       {n.image
                         ? <img src={n.image} alt={n.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                        : <div className="flex h-full items-center justify-center text-jade-700/20 text-xs">Chưa có ảnh</div>
+                        : <div className="flex h-full items-center justify-center text-jade-700/20 text-xs">{t('order.noImage')}</div>
                       }
                     </div>
                     <div className="p-4">

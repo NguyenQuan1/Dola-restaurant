@@ -1,13 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPublicContact } from '../api/contacts'
-
-const CONTACT_INFO = [
-  { label: 'Địa chỉ', value: '123 Đường Trần Phú, Hải Châu, Đà Nẵng' },
-  { label: 'Hotline', value: '0905 123 456' },
-  { label: 'Email', value: 'hello@dolarestaurant.vn' },
-  { label: 'Giờ mở cửa', value: ' 8:00 - 22:30 hàng ngày' },
-]
+import { useLanguage } from '../context/LanguageContext'
 
 // Cùng bộ variants với Home.jsx để chuyển động nhất quán trên toàn site
 const fadeInUp = {
@@ -31,10 +25,18 @@ const slideInRight = {
 }
 
 export default function Contact() {
+  const { t } = useLanguage()
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', subject: '', message: '' })
   const [sent, setSent] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+
+  const contactInfo = [
+    { label: t('contact.address'), value: t('contact.addressVal') },
+    { label: t('contact.phone'), value: t('contact.phoneVal') },
+    { label: t('contact.email'), value: t('contact.emailVal') },
+    { label: t('contact.workingHours'), value: t('contact.workingHoursVal') },
+  ]
 
   const handleChange = (key) => (e) => setForm((v) => ({ ...v, [key]: e.target.value }))
 
@@ -51,7 +53,7 @@ export default function Contact() {
       setTimeout(() => setSent(false), 3000)
     } catch (err) {
       setError(
-        err?.response?.data?.message || 'Gửi tin nhắn thất bại, vui lòng thử lại sau.',
+        err?.response?.data?.message || t('contact.sendError')
       )
     } finally {
       setSending(false)
@@ -80,10 +82,14 @@ export default function Contact() {
           variants={fadeInUp}
           className="text-center"
         >
-          <span className="font-script text-lg italic tracking-widest text-gold-dark">Kết nối với chúng tôi</span>
-          <h1 className="mt-3 font-display text-4xl font-semibold text-jade-700">Liên hệ</h1>
+          <span className="font-script text-lg italic tracking-widest text-gold-dark">
+            {t('contact.eyebrow')}
+          </span>
+          <h1 className="mt-3 font-display text-4xl font-semibold text-jade-700">
+            {t('contact.title')}
+          </h1>
           <p className="mt-4 mx-auto max-w-xl text-[15px] leading-relaxed text-ink-soft">
-            Mọi thắc mắc, góp ý hay yêu cầu đặc biệt, đừng ngần ngại liên hệ với Dola Restaurant.
+            {t('contact.subtitle')}
           </p>
         </motion.div>
 
@@ -102,7 +108,7 @@ export default function Contact() {
               variants={staggerContainer}
               className="grid grid-cols-1 gap-4 sm:grid-cols-2"
             >
-              {CONTACT_INFO.map((c) => (
+              {contactInfo.map((c) => (
                 <motion.div
                   key={c.label}
                   variants={fadeInUp}
@@ -148,7 +154,9 @@ export default function Contact() {
             variants={slideInRight}
             className="rounded-xl2 bg-ivory-deep p-8 shadow-card"
           >
-            <h2 className="font-display text-xl font-semibold text-jade-700">Gửi tin nhắn cho chúng tôi</h2>
+            <h2 className="font-display text-xl font-semibold text-jade-700">
+              {t('contact.formTitle')}
+            </h2>
 
             <AnimatePresence>
               {sent && (
@@ -158,7 +166,7 @@ export default function Contact() {
                   exit={{ opacity: 0, height: 0 }}
                   className="mt-4 overflow-hidden rounded-lg bg-jade-700/10 px-4 py-3 text-sm font-medium text-jade-700"
                 >
-                  Cảm ơn bạn! Tin nhắn đã được gửi, chúng tôi sẽ phản hồi sớm nhất.
+                  {t('contact.sendSuccess')}
                 </motion.p>
               )}
               {error && (
@@ -184,14 +192,14 @@ export default function Contact() {
               <motion.div variants={fadeInUp} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <input
                   required
-                  placeholder="Họ và tên *"
+                  placeholder={t('contact.formName')}
                   value={form.fullName}
                   onChange={handleChange('fullName')}
                   className="rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-sm outline-none focus:border-gold"
                 />
                 <input
                   required
-                  placeholder="Số điện thoại *"
+                  placeholder={t('contact.formPhone')}
                   value={form.phone}
                   onChange={handleChange('phone')}
                   className="rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-sm outline-none focus:border-gold"
@@ -201,14 +209,14 @@ export default function Contact() {
                 variants={fadeInUp}
                 required
                 type="email"
-                placeholder="Email *"
+                placeholder={t('contact.formEmail')}
                 value={form.email}
                 onChange={handleChange('email')}
                 className="w-full rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-sm outline-none focus:border-gold"
               />
               <motion.input
                 variants={fadeInUp}
-                placeholder="Chủ đề"
+                placeholder={t('contact.formSubject')}
                 value={form.subject}
                 onChange={handleChange('subject')}
                 className="w-full rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-sm outline-none focus:border-gold"
@@ -217,7 +225,7 @@ export default function Contact() {
                 variants={fadeInUp}
                 required
                 rows={5}
-                placeholder="Nội dung tin nhắn *"
+                placeholder={t('contact.formMessage')}
                 value={form.message}
                 onChange={handleChange('message')}
                 className="w-full rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-sm outline-none focus:border-gold"
@@ -229,7 +237,7 @@ export default function Contact() {
                   className="group relative w-full overflow-hidden rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3.5 text-[15px] font-semibold text-jade-900 shadow-gold transition-all disabled:opacity-60"
                 >
                   <span className="absolute left-0 top-0 h-full w-full -skew-x-12 -translate-x-full bg-white/30 transition-transform duration-1000 ease-in-out group-hover:translate-x-full" />
-                  <span className="relative z-10">{sending ? 'Đang gửi...' : 'Gửi tin nhắn'}</span>
+                  <span className="relative z-10">{sending ? t('contact.sending') : t('contact.formSubmit')}</span>
                 </button>
               </motion.div>
             </motion.form>

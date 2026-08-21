@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { resetPassword } from '../api/auth'
+import { useLanguage } from '../context/LanguageContext'
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 24 },
@@ -13,8 +14,8 @@ const staggerContainer = {
   visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
 }
 
-function StepIndicator({ step }) {
-  const steps = ['Gửi mã', 'Xác thực', 'Đổi mật khẩu']
+function StepIndicator({ step, t }) {
+  const steps = [t('auth.stepSendCode'), t('auth.stepVerify'), t('auth.stepReset')]
   return (
     <div className="mx-auto mt-6 flex max-w-xs items-center justify-center gap-2">
       {steps.map((label, i) => {
@@ -47,6 +48,7 @@ function StepIndicator({ step }) {
 export default function ResetPassword() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [email, setEmail] = useState(location.state?.email || '')
   const [code, setCode] = useState(location.state?.code || '')
   const [newPassword, setNewPassword] = useState('')
@@ -58,15 +60,15 @@ export default function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!email.trim() || !code.trim()) {
-      setError('Thiếu thông tin xác thực')
+      setError(t('auth.errFillFields'))
       return
     }
     if (newPassword.length < 6) {
-      setError('Mật khẩu mới phải có ít nhất 6 ký tự')
+      setError(t('auth.errMinPassword'))
       return
     }
     if (newPassword !== confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp')
+      setError(t('auth.errMismatchPassword'))
       return
     }
 
@@ -76,7 +78,7 @@ export default function ResetPassword() {
       await resetPassword({ email, code, newPassword })
       setDone(true)
     } catch (err) {
-      const message = err?.response?.data?.message || 'Không thể đổi mật khẩu'
+      const message = err?.response?.data?.message || t('common.error')
       setError(message)
     } finally {
       setLoading(false)
@@ -98,12 +100,16 @@ export default function ResetPassword() {
         className="relative z-10 mx-auto w-full max-w-md px-6"
       >
         <motion.div variants={fadeInUp} className="text-center">
-          <span className="font-script text-lg italic tracking-widest text-gold-dark">Đặt lại mật khẩu</span>
-          <h1 className="mt-2 font-display text-3xl font-semibold text-jade-700">Tạo mật khẩu mới</h1>
+          <span className="font-script text-lg italic tracking-widest text-gold-dark">
+            {t('auth.resetSubtitle')}
+          </span>
+          <h1 className="mt-2 font-display text-3xl font-semibold text-jade-700">
+            {t('auth.resetTitle')}
+          </h1>
         </motion.div>
 
         <motion.div variants={fadeInUp}>
-          <StepIndicator step={done ? 4 : 3} />
+          <StepIndicator step={done ? 4 : 3} t={t} />
         </motion.div>
 
         <motion.div variants={fadeInUp} className="mt-8 rounded-xl2 bg-ivory-deep p-8 shadow-card">
@@ -125,7 +131,7 @@ export default function ResetPassword() {
                   ✓
                 </motion.span>
                 <p className="mt-4 text-sm leading-relaxed text-ink-soft">
-                  Mật khẩu của bạn đã được cập nhật thành công.
+                  {t('auth.resetSuccess')}
                 </p>
                 <motion.button
                   whileHover={{ scale: 1.03 }}
@@ -133,7 +139,7 @@ export default function ResetPassword() {
                   onClick={() => navigate('/dang-nhap')}
                   className="mt-6 rounded-full border border-jade-700/25 px-6 py-2.5 text-sm font-semibold text-jade-700 hover:bg-ivory"
                 >
-                  Về đăng nhập
+                  {t('auth.backToLogin')}
                 </motion.button>
               </motion.div>
             ) : (
@@ -158,7 +164,7 @@ export default function ResetPassword() {
                   )}
                 </AnimatePresence>
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Email</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('auth.emailOrPhone')}</label>
                   <input
                     type="email"
                     value={email}
@@ -167,7 +173,7 @@ export default function ResetPassword() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Mã xác thực</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('auth.verifyTitle')}</label>
                   <input
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
@@ -175,21 +181,23 @@ export default function ResetPassword() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Mật khẩu mới</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('auth.newPassword')}</label>
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-sm outline-none focus:border-gold"
+                    placeholder={t('auth.newPasswordPlaceholder')}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Xác nhận mật khẩu</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('auth.confirmPassword')}</label>
                   <input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-sm outline-none focus:border-gold"
+                    placeholder={t('auth.newPasswordPlaceholder')}
                   />
                 </div>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
@@ -198,7 +206,7 @@ export default function ResetPassword() {
                     disabled={loading}
                     className="w-full rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3 text-[15px] font-semibold text-jade-900 shadow-gold transition-transform disabled:opacity-60"
                   >
-                    {loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu'}
+                    {loading ? t('auth.resetting') : t('auth.resetBtn')}
                   </button>
                 </motion.div>
               </motion.form>

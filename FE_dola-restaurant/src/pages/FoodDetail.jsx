@@ -7,6 +7,7 @@ import { fetchReviewsByFoodId, createReview, replyReview } from '../api/reviews'
 import { getReviews } from '../data/reviews'
 import PlaceholderPage from '../components/PlaceholderPage'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { MessageSquare, ChevronDown, ChevronUp, Reply, Send, CornerDownRight } from 'lucide-react'
 
 // Cấu hình các animation variants chuẩn từ NewsDetail
@@ -31,6 +32,7 @@ export default function FoodDetail() {
   const { id } = useReactParams()
   const navigate = useRouterNavigate()
   const { isAuthenticated, user } = useAuth()
+  const { t, language } = useLanguage()
 
   const [food, setFood] = useState(null)
   const [related, setRelated] = useState([])
@@ -81,11 +83,11 @@ export default function FoodDetail() {
   const submitReplyHandler = async (e, targetReview, reviewKey) => {
     e.preventDefault()
     if (!isAuthenticated) {
-      setReplyError('Bạn cần đăng nhập để trả lời')
+      setReplyError(t('foodDetail.loginToReply'))
       return
     }
     if (!replyText.trim()) {
-      setReplyError('Vui lòng nhập nội dung câu trả lời')
+      setReplyError(t('foodDetail.replyPlaceholder'))
       return
     }
 
@@ -102,7 +104,7 @@ export default function FoodDetail() {
           replyText: replyText.trim(),
           createdAt: new Date().toISOString(),
           user: {
-            fullName: user?.fullName || user?.email || 'Khách hàng',
+            fullName: user?.fullName || user?.email || 'User',
             role: user?.role || 'customer',
           },
         }
@@ -124,7 +126,7 @@ export default function FoodDetail() {
       setReplyText('')
       setReplyingToId(null)
     } catch (err) {
-      const msg = err.response?.data?.message || 'Không thể gửi câu trả lời. Vui lòng thử lại.'
+      const msg = err.response?.data?.message || t('foodDetail.replyError')
       setReplyError(Array.isArray(msg) ? msg.join(', ') : msg)
     } finally {
       setSubmittingReply(false)
@@ -206,27 +208,17 @@ export default function FoodDetail() {
   }
 
   if (notFound || !food) {
-    return (
-      <PlaceholderPage
-        title="Không tìm thấy món ăn"
-        description="Món ăn bạn tìm không tồn tại hoặc đã bị gỡ khỏi thực đơn."
-      />
-    )
+    return <PlaceholderPage title={t('foodDetail.dishNotFound')} description={t('foodDetail.dishNotFoundDesc')} />
   }
 
-  const avgRating =
-    reviews.length > 0
-      ? (reviews.reduce((s, r) => s + (Number(r.rating) || 0), 0) / reviews.length).toFixed(1)
-      : food.rating
+  const avgRating = reviews.length
+    ? (reviews.reduce((s, r) => s + (Number(r.rating) || 5), 0) / reviews.length).toFixed(1)
+    : food.rating || 0
 
   const submitReviewHandler = async (e) => {
     e.preventDefault()
-    if (!isAuthenticated) {
-      setSubmitError('Bạn cần đăng nhập để gửi đánh giá')
-      return
-    }
     if (!comment.trim()) {
-      setSubmitError('Vui lòng nhập nội dung bình luận')
+      setSubmitError(t('foodDetail.commentPlaceholder'))
       return
     }
 
@@ -244,9 +236,9 @@ export default function FoodDetail() {
       setReviews((prev) => [createdReview, ...prev])
       setComment('')
       setNewRating(5)
-      setSubmitSuccess('Cảm ơn bạn! Đánh giá của bạn đã được gửi thành công.')
+      setSubmitSuccess(t('foodDetail.reviewSuccess'))
     } catch (err) {
-      const msg = err.response?.data?.message || 'Không thể gửi đánh giá. Vui lòng thử lại sau.'
+      const msg = err.response?.data?.message || t('foodDetail.reviewError')
       setSubmitError(Array.isArray(msg) ? msg.join(', ') : msg)
     } finally {
       setSubmitting(false)
@@ -263,14 +255,14 @@ export default function FoodDetail() {
       >
         {/* Thanh điều hướng Breadcrumb */}
         <motion.nav variants={fadeInUp} className="text-xs text-ink-soft">
-          <RouterLink to="/" className="hover:text-jade-700">Trang chủ</RouterLink> /{' '}
-          <RouterLink to="/thuc-don" className="hover:text-jade-700">Thực đơn</RouterLink> /{' '}
+          <RouterLink to="/" className="hover:text-jade-700">{t('foodDetail.breadcrumbHome')}</RouterLink> /{' '}
+          <RouterLink to="/thuc-don" className="hover:text-jade-700">{t('foodDetail.breadcrumbMenu')}</RouterLink> /{' '}
           <span className="text-jade-700">{food.name}</span>
         </motion.nav>
 
         {/* Khối Thông tin Món ăn chính */}
         <div className="mt-8 grid grid-cols-1 gap-12 lg:grid-cols-2">
-          {/* GALLERY MÓN ĂN - Áp dụng Scale và hiệu ứng xuất hiện */}
+          {/* GALLERY MÓN ĂN */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -314,7 +306,9 @@ export default function FoodDetail() {
                     {'★'.repeat(Math.round(avgRating))}
                     <span className="text-jade-100">{'★'.repeat(5 - Math.round(avgRating))}</span>
                   </span>
-                  <span className="text-sm text-ink-soft">{avgRating} ({reviews.length} đánh giá)</span>
+                  <span className="text-sm text-ink-soft">
+                    {avgRating} ({t('foodDetail.reviewsCount', { count: reviews.length })})
+                  </span>
                 </>
               )}
               <span
@@ -322,7 +316,7 @@ export default function FoodDetail() {
                   food.available ? 'bg-jade-700/10 text-jade-700' : 'bg-ink-soft/10 text-ink-soft'
                 }`}
               >
-                {food.available ? 'Còn món' : 'Hết món'}
+                {food.available ? t('foodDetail.available') : t('foodDetail.soldOut')}
               </span>
             </div>
 
@@ -331,7 +325,7 @@ export default function FoodDetail() {
 
             {food.ingredients && food.ingredients.length > 0 && (
               <div className="mt-6">
-                <h3 className="font-display text-base font-semibold text-jade-700">Thành phần</h3>
+                <h3 className="font-display text-base font-semibold text-jade-700">{t('foodDetail.ingredients')}</h3>
                 <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {food.ingredients.map((ing) => (
                     <li key={ing} className="flex items-center gap-2 text-sm text-ink-soft">
@@ -349,7 +343,7 @@ export default function FoodDetail() {
                 onClick={() => navigate('/dat-ban')}
                 className="rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3 text-[15px] font-semibold text-jade-900 shadow-gold transition-colors"
               >
-                Đặt bàn ngay
+                {t('foodDetail.bookTable')}
               </motion.button>
             </div>
           </motion.div>
@@ -359,17 +353,17 @@ export default function FoodDetail() {
         <motion.div variants={fadeInUp} className="mt-20 grid grid-cols-1 gap-12 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <h2 className="font-display text-2xl font-semibold text-jade-700">
-              Đánh giá từ khách hàng ({reviews.length})
+              {t('foodDetail.customerReviews', { count: reviews.length })}
             </h2>
             <div className="mt-6 space-y-6">
               {reviews.length === 0 && (
-                <p className="text-sm text-ink-soft">Chưa có đánh giá nào cho món này. Hãy là người đầu tiên!</p>
+                <p className="text-sm text-ink-soft">{t('foodDetail.noReviews')}</p>
               )}
               {reviews.map((r, i) => {
                 const reviewId = r.id || i
-                const authorName = r.user?.fullName || r.name || 'Khách hàng'
+                const authorName = r.user?.fullName || r.name || t('home.reviews.authorDefault')
                 const displayDate = r.createdAt
-                  ? new Date(r.createdAt).toLocaleDateString('vi-VN')
+                  ? new Date(r.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : language === 'zh' ? 'zh-CN' : language === 'ja' ? 'ja-JP' : language === 'ko' ? 'ko-KR' : 'vi-VN')
                   : (r.date || '')
                 const ratingStars = Math.min(5, Math.max(1, Number(r.rating) || 5))
                 const replies = r.replies || []
@@ -404,7 +398,7 @@ export default function FoodDetail() {
                           className="inline-flex items-center gap-1.5 font-medium text-jade-700 hover:text-jade-800 transition-colors bg-jade-700/5 hover:bg-jade-700/10 px-3 py-1.5 rounded-full"
                         >
                           <MessageSquare size={13} className="text-gold-dark" />
-                          <span>{replies.length} phản hồi</span>
+                          <span>{t('foodDetail.viewReplies', { count: replies.length })}</span>
                           {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                         </button>
                       )}
@@ -415,7 +409,7 @@ export default function FoodDetail() {
                         className="inline-flex items-center gap-1.5 font-medium text-ink-soft hover:text-jade-700 transition-colors px-2 py-1"
                       >
                         <Reply size={13} />
-                        <span>Trả lời</span>
+                        <span>{t('foodDetail.reply')}</span>
                       </button>
                     </div>
 
@@ -424,10 +418,10 @@ export default function FoodDetail() {
                       <div className="mt-4 space-y-3 rounded-xl bg-jade-700/5 p-4 border-l-2 border-gold transition-all">
                         {replies.map((reply, idx) => {
                           const replyUser = reply.user
-                          const replyAuthorName = replyUser?.fullName || reply.author || 'Người dùng'
+                          const replyAuthorName = replyUser?.fullName || reply.author || t('home.reviews.authorDefault')
                           const isAdmin = !!reply.isAdminReply
                           const replyDate = reply.createdAt
-                            ? new Date(reply.createdAt).toLocaleDateString('vi-VN')
+                            ? new Date(reply.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : language === 'zh' ? 'zh-CN' : language === 'ja' ? 'ja-JP' : language === 'ko' ? 'ko-KR' : 'vi-VN')
                             : (reply.date || '')
 
                           return (
@@ -442,7 +436,7 @@ export default function FoodDetail() {
                                   </span>
                                   {isAdmin && (
                                     <span className="rounded bg-gold/20 px-1.5 py-0.5 text-[10px] font-semibold text-gold-dark">
-                                      Nhà hàng Dola
+                                      Dola Restaurant
                                     </span>
                                   )}
                                   <span className="text-[10px] text-ink-soft">
@@ -455,7 +449,7 @@ export default function FoodDetail() {
                                   className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-medium text-ink-soft hover:text-jade-700 flex items-center gap-0.5"
                                 >
                                   <CornerDownRight size={12} />
-                                  <span>Rep</span>
+                                  <span>{t('foodDetail.reply')}</span>
                                 </button>
                               </div>
                               <p className="mt-1.5 pl-8 text-xs text-ink-soft leading-relaxed">
@@ -472,13 +466,13 @@ export default function FoodDetail() {
                       <div className="mt-4 rounded-xl bg-ivory p-4 border border-jade-700/15 shadow-inner">
                         {!isAuthenticated ? (
                           <div className="flex items-center justify-between text-xs text-ink-soft">
-                            <span>Bạn cần đăng nhập để trả lời bình luận này.</span>
+                            <span>{t('foodDetail.loginToReply')}</span>
                             <button
                               type="button"
                               onClick={() => navigate('/dang-nhap')}
                               className="font-semibold text-jade-700 hover:underline"
                             >
-                              Đăng nhập
+                              {t('nav.login')}
                             </button>
                           </div>
                         ) : (
@@ -491,7 +485,7 @@ export default function FoodDetail() {
                               rows={2}
                               value={replyText}
                               onChange={(e) => setReplyText(e.target.value)}
-                              placeholder="Nhập câu trả lời của bạn..."
+                              placeholder={t('foodDetail.replyPlaceholder')}
                               className="w-full rounded-lg border border-jade-700/15 bg-white p-3 text-xs outline-none focus:border-gold transition-colors"
                             />
                             <div className="flex items-center justify-end gap-2">
@@ -504,7 +498,7 @@ export default function FoodDetail() {
                                 }}
                                 className="rounded-full px-3.5 py-1.5 text-xs font-medium text-ink-soft hover:bg-jade-50 transition-colors"
                               >
-                                Hủy
+                                {t('common.cancel')}
                               </button>
                               <button
                                 type="submit"
@@ -512,7 +506,7 @@ export default function FoodDetail() {
                                 className="inline-flex items-center gap-1.5 rounded-full bg-jade-700 px-4 py-1.5 text-xs font-semibold text-ivory hover:bg-jade-600 disabled:opacity-50 transition-colors shadow-sm"
                               >
                                 <Send size={12} />
-                                {submittingReply ? 'Đang gửi...' : 'Gửi trả lời'}
+                                {submittingReply ? t('foodDetail.submittingReply') : t('foodDetail.sendReply')}
                               </button>
                             </div>
                           </form>
@@ -527,7 +521,9 @@ export default function FoodDetail() {
 
           {/* FORM ĐÁNH GIÁ */}
           <div>
-            <h3 className="font-display text-lg font-semibold text-jade-700">Viết đánh giá</h3>
+            <h3 className="font-display text-lg font-semibold text-jade-700">
+              {t('foodDetail.leaveReview')}
+            </h3>
 
             {!isAuthenticated ? (
               <div className="mt-4 rounded-xl2 bg-ivory-deep p-6 text-center shadow-card border border-jade-700/10">
@@ -535,17 +531,14 @@ export default function FoodDetail() {
                   ★
                 </div>
                 <h4 className="mt-3 font-display text-base font-semibold text-jade-700">
-                  Yêu cầu đăng nhập
+                  {t('foodDetail.loginToReview')}
                 </h4>
-                <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-                  Bạn cần đăng nhập tài khoản để có thể đánh giá và chia sẻ nhận xét về món ăn này.
-                </p>
                 <button
                   type="button"
                   onClick={() => navigate('/dang-nhap')}
                   className="mt-5 w-full rounded-full bg-jade-700 px-6 py-2.5 text-sm font-semibold text-ivory hover:bg-jade-600 transition-colors shadow-sm"
                 >
-                  Đăng nhập ngay
+                  {t('foodDetail.loginNow')}
                 </button>
               </div>
             ) : (
@@ -563,19 +556,19 @@ export default function FoodDetail() {
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-ink-soft">Họ tên</label>
-                    <span className="text-[10px] text-jade-700 font-semibold">(Tự động từ tài khoản)</span>
+                    <label className="text-xs font-medium text-ink-soft">{t('foodDetail.fullName')}</label>
+                    <span className="text-[10px] text-jade-700 font-semibold">{t('foodDetail.autoFromAccount')}</span>
                   </div>
                   <input
                     type="text"
                     disabled
-                    value={user?.fullName || user?.email || 'Người dùng'}
+                    value={user?.fullName || user?.email || 'User'}
                     className="mt-1 w-full rounded-lg border border-jade-700/15 bg-ivory/70 px-3 py-2 text-sm font-semibold text-jade-800 cursor-not-allowed"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Chấm sao</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('foodDetail.ratingStar')}</label>
                   <div className="mt-1 flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map((n) => (
                       <button
@@ -587,23 +580,23 @@ export default function FoodDetail() {
                         className={`text-2xl transition-transform hover:scale-110 ${
                           n <= (hoverRating || newRating) ? 'text-gold-dark' : 'text-jade-100'
                         }`}
-                        title={`${n} sao`}
+                        title={`${n} ${t('foodDetail.starsUnit')}`}
                       >
                         ★
                       </button>
                     ))}
                     <span className="ml-2 text-xs font-medium text-ink-soft">
-                      {hoverRating || newRating} / 5 sao
+                      {hoverRating || newRating} / 5 {t('foodDetail.starsUnit')}
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Bình luận</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('foodDetail.comment')}</label>
                   <textarea
                     required
                     rows={4}
-                    placeholder="Chia sẻ trải nghiệm của bạn về món ăn này..."
+                    placeholder={t('foodDetail.commentPlaceholder')}
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-jade-700/15 bg-ivory px-3 py-2 text-sm outline-none focus:border-gold"
@@ -615,17 +608,19 @@ export default function FoodDetail() {
                   disabled={submitting}
                   className="w-full rounded-full bg-jade-700 px-6 py-2.5 text-sm font-semibold text-ivory hover:bg-jade-600 disabled:opacity-50 transition-colors shadow-sm"
                 >
-                  {submitting ? 'Đang gửi...' : 'Gửi đánh giá'}
+                  {submitting ? t('foodDetail.submitting') : t('foodDetail.submitReview')}
                 </button>
               </form>
             )}
           </div>
         </motion.div>
 
-        {/* MÓN LIÊN QUAN - Hiệu ứng hiển thị Staggered */}
+        {/* MÓN LIÊN QUAN */}
         {related.length > 0 && (
           <div className="mt-20">
-            <motion.h2 variants={fadeInUp} className="font-display text-2xl font-semibold text-jade-700">Món liên quan</motion.h2>
+            <motion.h2 variants={fadeInUp} className="font-display text-2xl font-semibold text-jade-700">
+              {t('foodDetail.relatedDishes')}
+            </motion.h2>
             <motion.div 
               initial="hidden"
               whileInView="visible"

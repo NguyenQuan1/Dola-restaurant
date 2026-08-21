@@ -194,6 +194,10 @@ export default function OrdersManagement() {
     const [historyEndDate, setHistoryEndDate] = useState('')
     const [historyPaymentMethodFilter, setHistoryPaymentMethodFilter] = useState('all')
 
+    // Phân trang cho bảng lịch sử (client-side)
+    const [historyPage, setHistoryPage] = useState(1)
+    const HISTORY_PAGE_SIZE = 10
+
     // Modal xem chi tiết đơn hàng lịch sử / in hóa đơn
     const [selectedHistoryOrder, setSelectedHistoryOrder] = useState(null)
     const [detailModalOpen, setDetailModalOpen] = useState(false)
@@ -302,6 +306,11 @@ export default function OrdersManagement() {
             fetchHistoryOrders()
         }
     }, [currentTab, fetchHistoryOrders])
+
+    // Reset về trang 1 mỗi khi bộ lọc lịch sử thay đổi
+    useEffect(() => {
+        setHistoryPage(1)
+    }, [historyStatus, historyPaymentMethodFilter, historySearch, historyDatePreset, historyStartDate, historyEndDate])
 
     // Khởi tạo fetch dữ liệu active & WebSocket connection
     useEffect(() => {
@@ -685,7 +694,7 @@ export default function OrdersManagement() {
     }
 
     // ──────────────────────────────────────────────────────────
-    // THỐNG KÊ LỊCH SỬ ĐƠN HÀNG
+    // THỐNG KÊ LỊCH SỬ ĐƠN HÀNG (tính trên toàn bộ tập đã lọc, không phụ thuộc trang hiện tại)
     // ──────────────────────────────────────────────────────────
     const historyStats = useMemo(() => {
         const totalOrders = historyOrders.length
@@ -700,6 +709,30 @@ export default function OrdersManagement() {
             revenue: totalRevenue,
         }
     }, [historyOrders])
+
+    // ──────────────────────────────────────────────────────────
+    // PHÂN TRANG LỊCH SỬ ĐƠN HÀNG (client-side)
+    // ──────────────────────────────────────────────────────────
+    const totalHistoryPages = Math.max(1, Math.ceil(historyOrders.length / HISTORY_PAGE_SIZE))
+
+    useEffect(() => {
+        if (historyPage > totalHistoryPages) setHistoryPage(totalHistoryPages)
+    }, [totalHistoryPages, historyPage])
+
+    const paginatedHistoryOrders = useMemo(() => {
+        const start = (historyPage - 1) * HISTORY_PAGE_SIZE
+        return historyOrders.slice(start, start + HISTORY_PAGE_SIZE)
+    }, [historyOrders, historyPage])
+
+    const historyPageNumbers = useMemo(() => {
+        return Array.from({ length: totalHistoryPages }, (_, i) => i + 1)
+            .filter((p) => p === 1 || p === totalHistoryPages || Math.abs(p - historyPage) <= 1)
+            .reduce((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...')
+                acc.push(p)
+                return acc
+            }, [])
+    }, [totalHistoryPages, historyPage])
 
     return (
         <div className="mx-auto max-w-6xl p-6">
@@ -1618,138 +1651,196 @@ export default function OrdersManagement() {
                                 <p className="text-sm font-medium">Không tìm thấy đơn hàng nào phù hợp với bộ lọc.</p>
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs">
-                                    <thead>
-                                        <tr className="border-b border-border bg-surface text-ink-soft font-medium">
-                                            <th className="px-4 py-3">Mã đơn</th>
-                                            <th className="px-4 py-3">Bàn / Loại</th>
-                                            <th className="px-4 py-3">Khách hàng</th>
-                                            <th className="px-4 py-3">Thời gian</th>
-                                            <th className="px-4 py-3 text-center">Số món</th>
-                                            <th className="px-4 py-3 text-right">Tổng thanh toán</th>
-                                            <th className="px-4 py-3">Phương thức</th>
-                                            <th className="px-4 py-3 text-center">Trạng thái</th>
-                                            <th className="px-4 py-3 text-center">Thao tác</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {historyOrders.map((histOrder) => {
-                                            const isCompleted = histOrder.status === 'completed'
-                                            const isCancelled = histOrder.status === 'cancelled'
+                            <>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[880px] table-fixed text-left text-xs">
+                                        <colgroup>
+                                            <col className="w-[13%]" />
+                                            <col className="w-[10%]" />
+                                            <col className="w-[16%]" />
+                                            <col className="w-[13%]" />
+                                            <col className="w-[7%]" />
+                                            <col className="w-[14%]" />
+                                            <col className="w-[10%]" />
+                                            <col className="w-[9%]" />
+                                            <col className="w-[8%]" />
+                                        </colgroup>
+                                        <thead>
+                                            <tr className="border-b border-border bg-surface text-ink-soft font-medium">
+                                                <th className="px-4 py-3 truncate">Mã đơn</th>
+                                                <th className="px-4 py-3 truncate">Bàn / Loại</th>
+                                                <th className="px-4 py-3 truncate">Khách hàng</th>
+                                                <th className="px-4 py-3 truncate">Thời gian</th>
+                                                <th className="px-4 py-3 text-center truncate">Số món</th>
+                                                <th className="px-4 py-3 text-right truncate">Tổng thanh toán</th>
+                                                <th className="px-4 py-3 truncate">Phương thức</th>
+                                                <th className="px-4 py-3 text-center truncate">Trạng thái</th>
+                                                <th className="px-4 py-3 text-center truncate">Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border">
+                                            {paginatedHistoryOrders.map((histOrder) => {
+                                                const isCompleted = histOrder.status === 'completed'
+                                                const isCancelled = histOrder.status === 'cancelled'
 
-                                            // Khi đơn hoàn thành: chỉ tính số lượng các món hoàn thành (không tính món hủy)
-                                            const validItems = (histOrder.orderItems || []).filter(
-                                                (i) => i.status !== 'cancelled'
-                                            )
-                                            const totalItemsCount = isCompleted
-                                                ? validItems.reduce((s, i) => s + Number(i.quantity || 1), 0)
-                                                : (histOrder.orderItems || []).reduce(
-                                                    (s, i) => s + Number(i.quantity || 1),
-                                                    0
+                                                // Khi đơn hoàn thành: chỉ tính số lượng các món hoàn thành (không tính món hủy)
+                                                const validItems = (histOrder.orderItems || []).filter(
+                                                    (i) => i.status !== 'cancelled'
                                                 )
+                                                const totalItemsCount = isCompleted
+                                                    ? validItems.reduce((s, i) => s + Number(i.quantity || 1), 0)
+                                                    : (histOrder.orderItems || []).reduce(
+                                                        (s, i) => s + Number(i.quantity || 1),
+                                                        0
+                                                    )
 
-                                            let statusBadge = (
-                                                <span className="rounded-full bg-saffron-light px-2.5 py-0.5 text-[10px] font-semibold text-saffron-dark">
-                                                    Đang phục vụ
-                                                </span>
-                                            )
-                                            if (isCompleted) {
-                                                statusBadge = (
-                                                    <span className="rounded-full bg-teal-light px-2.5 py-0.5 text-[10px] font-semibold text-teal">
-                                                        Hoàn thành
+                                                let statusBadge = (
+                                                    <span className="rounded-full bg-saffron-light px-2.5 py-0.5 text-[10px] font-semibold text-saffron-dark">
+                                                        Đang phục vụ
                                                     </span>
                                                 )
-                                            } else if (isCancelled) {
-                                                statusBadge = (
-                                                    <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-semibold text-red-700">
-                                                        Đã hủy
-                                                    </span>
-                                                )
-                                            }
+                                                if (isCompleted) {
+                                                    statusBadge = (
+                                                        <span className="rounded-full bg-teal-light px-2.5 py-0.5 text-[10px] font-semibold text-teal">
+                                                            Hoàn thành
+                                                        </span>
+                                                    )
+                                                } else if (isCancelled) {
+                                                    statusBadge = (
+                                                        <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-semibold text-red-700">
+                                                            Đã hủy
+                                                        </span>
+                                                    )
+                                                }
 
-                                            return (
-                                                <tr
-                                                    key={histOrder.id}
-                                                    className="hover:bg-black/[0.02] transition-colors"
+                                                return (
+                                                    <tr
+                                                        key={histOrder.id}
+                                                        className="hover:bg-black/[0.02] transition-colors"
+                                                    >
+                                                        <td className="px-4 py-3 font-mono font-semibold text-ink truncate">
+                                                            {histOrder.code}
+                                                        </td>
+                                                        <td className="px-4 py-3 truncate">
+                                                            <span className="font-semibold text-ink">
+                                                                {histOrder.table ? `Bàn ${histOrder.table.code}` : 'Mang về'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 overflow-hidden">
+                                                            <div className="truncate font-medium text-ink">
+                                                                {histOrder.customerName || 'Khách vãng lai'}
+                                                            </div>
+                                                            {histOrder.customerPhone && (
+                                                                <div className="truncate text-[10px] text-muted">
+                                                                    {histOrder.customerPhone}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-ink-soft whitespace-nowrap truncate">
+                                                            {formatDateTime(histOrder.createdAt)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center font-medium truncate">
+                                                            <span>{totalItemsCount} món</span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-mono overflow-hidden">
+                                                            <div className="truncate font-bold text-ink">
+                                                                {formatVnd(histOrder.finalAmount ?? histOrder.totalAmount)}
+                                                            </div>
+                                                            {Number(histOrder.discountAmount) > 0 && (
+                                                                <div className="truncate text-[10px] text-teal">
+                                                                    Giảm {formatVnd(histOrder.discountAmount)}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 truncate">
+                                                            <span className="capitalize text-ink-soft">
+                                                                {histOrder.paymentMethod === 'cash'
+                                                                    ? 'Tiền mặt'
+                                                                    : histOrder.paymentMethod === 'card'
+                                                                        ? 'Thẻ'
+                                                                        : histOrder.paymentMethod === 'transfer'
+                                                                            ? 'Chuyển khoản'
+                                                                            : histOrder.paymentMethod === 'ewallet'
+                                                                                ? 'Ví điện tử'
+                                                                                : histOrder.paymentMethod || 'Chưa TT'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center truncate">{statusBadge}</td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setSelectedHistoryOrder(histOrder)
+                                                                        setDetailModalOpen(true)
+                                                                    }}
+                                                                    className="rounded-lg border border-border p-1.5 text-ink-soft hover:bg-black/[0.04] hover:text-ink transition-colors"
+                                                                    title="Xem chi tiết đơn hàng"
+                                                                >
+                                                                    <Eye size={14} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handlePrintOrder(histOrder)}
+                                                                    className="rounded-lg border border-border p-1.5 text-ink-soft hover:bg-black/[0.04] hover:text-ink transition-colors"
+                                                                    title="In hóa đơn"
+                                                                >
+                                                                    <Printer size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Thanh phân trang */}
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs">
+                                    <span className="text-muted">
+                                        Hiển thị {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}–
+                                        {Math.min(historyPage * HISTORY_PAGE_SIZE, historyOrders.length)} trong tổng số {historyOrders.length} đơn
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                                            disabled={historyPage === 1}
+                                            className="rounded-lg border border-border px-2.5 py-1.5 font-medium text-ink-soft hover:bg-black/[0.03] disabled:opacity-40 disabled:hover:bg-transparent"
+                                        >
+                                            Trước
+                                        </button>
+
+                                        {historyPageNumbers.map((p, idx) =>
+                                            p === '...' ? (
+                                                <span key={`ellipsis-${idx}`} className="px-1.5 text-muted">…</span>
+                                            ) : (
+                                                <button
+                                                    key={p}
+                                                    type="button"
+                                                    onClick={() => setHistoryPage(p)}
+                                                    className={`min-w-[28px] rounded-lg border px-2 py-1.5 font-semibold ${p === historyPage
+                                                        ? 'border-ink bg-ink text-paper'
+                                                        : 'border-border text-ink-soft hover:bg-black/[0.03]'
+                                                        }`}
                                                 >
-                                                    <td className="px-4 py-3 font-mono font-semibold text-ink">
-                                                        {histOrder.code}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <span className="font-semibold text-ink">
-                                                            {histOrder.table ? `Bàn ${histOrder.table.code}` : 'Mang về'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <div className="font-medium text-ink">
-                                                            {histOrder.customerName || 'Khách vãng lai'}
-                                                        </div>
-                                                        {histOrder.customerPhone && (
-                                                            <div className="text-[10px] text-muted">
-                                                                {histOrder.customerPhone}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-ink-soft whitespace-nowrap">
-                                                        {formatDateTime(histOrder.createdAt)}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center font-medium">
-                                                        <span>{totalItemsCount} món</span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right font-mono">
-                                                        <div className="font-bold text-ink">
-                                                            {formatVnd(histOrder.finalAmount ?? histOrder.totalAmount)}
-                                                        </div>
-                                                        {Number(histOrder.discountAmount) > 0 && (
-                                                            <div className="text-[10px] text-teal">
-                                                                Giảm {formatVnd(histOrder.discountAmount)}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <span className="capitalize text-ink-soft">
-                                                            {histOrder.paymentMethod === 'cash'
-                                                                ? 'Tiền mặt'
-                                                                : histOrder.paymentMethod === 'card'
-                                                                    ? 'Thẻ'
-                                                                    : histOrder.paymentMethod === 'transfer'
-                                                                        ? 'Chuyển khoản'
-                                                                        : histOrder.paymentMethod === 'ewallet'
-                                                                            ? 'Ví điện tử'
-                                                                            : histOrder.paymentMethod || 'Chưa TT'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">{statusBadge}</td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setSelectedHistoryOrder(histOrder)
-                                                                    setDetailModalOpen(true)
-                                                                }}
-                                                                className="rounded-lg border border-border p-1.5 text-ink-soft hover:bg-black/[0.04] hover:text-ink transition-colors"
-                                                                title="Xem chi tiết đơn hàng"
-                                                            >
-                                                                <Eye size={14} />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handlePrintOrder(histOrder)}
-                                                                className="rounded-lg border border-border p-1.5 text-ink-soft hover:bg-black/[0.04] hover:text-ink transition-colors"
-                                                                title="In hóa đơn"
-                                                            >
-                                                                <Printer size={14} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                                    {p}
+                                                </button>
                                             )
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                                            disabled={historyPage === totalHistoryPages}
+                                            className="rounded-lg border border-border px-2.5 py-1.5 font-medium text-ink-soft hover:bg-black/[0.03] disabled:opacity-40 disabled:hover:bg-transparent"
+                                        >
+                                            Sau
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
@@ -2067,7 +2158,7 @@ export default function OrdersManagement() {
                 <div id="printable-receipt" className="hidden print:block print:p-6 text-black bg-white">
                     <div className="text-center pb-3 border-b border-black">
                         <h2 className="text-xl font-bold uppercase tracking-wider">DOLA RESTAURANT</h2>
-                        <p className="text-xs">Ẩm thực Á - Âu sang trọng & Đậm đà</p>
+                        <p className="text-xs">Tinh hoa ẩm thực Việt – Vạn vị yêu thương.</p>
                         <p className="text-[11px]">Hotline: 1900 6789 | dola-restaurant.vn</p>
                     </div>
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import AuthArt from '../components/AuthArt'
 
 function IconMail(props) {
@@ -41,7 +42,6 @@ function IconEyeOff(props) {
   )
 }
 
-// Cùng bộ variants với Home.jsx để chuyển động nhất quán trên toàn site
 const fadeInUp = {
   hidden: { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.215, 0.61, 0.355, 1] } },
@@ -54,6 +54,7 @@ const staggerContainer = {
 
 export default function Login() {
   const { login, lockedMessage, clearLockedMessage } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const [form, setForm] = useState({ email: '', password: '' })
@@ -64,7 +65,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.email.trim() || !form.password.trim()) {
-      setError('Vui lòng nhập đầy đủ email và mật khẩu')
+      setError(t('auth.errFillFields'))
       return
     }
     setLoading(true)
@@ -73,7 +74,7 @@ export default function Login() {
       await login(form)
       navigate(location.state?.from || '/tai-khoan')
     } catch (err) {
-      const message = err?.response?.data?.message || 'Đăng nhập thất bại, vui lòng thử lại'
+      const message = err?.response?.data?.message || t('auth.errLoginFailed')
       setError(message)
     } finally {
       setLoading(false)
@@ -82,7 +83,7 @@ export default function Login() {
 
   return (
     <section className="relative min-h-screen overflow-hidden bg-ivory">
-      {/* Glow bập bùng phía sau — cùng hiệu ứng với hero ở trang chủ */}
+      {/* Glow bập bùng phía sau */}
       <motion.div
         animate={{ scale: [1, 1.2, 1], opacity: [0.25, 0.45, 0.25] }}
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
@@ -96,10 +97,10 @@ export default function Login() {
 
       <div className="relative z-10 flex min-h-screen flex-col lg:flex-row">
         <AuthArt
-          eyebrow="Chào mừng trở lại"
-          title="Mỗi lần đăng nhập là một lần trở về bàn ăn quen thuộc."
-          quote="Dola giữ trọn hương vị Việt trong từng món, từng lần ghé thăm."
-          author="Bếp trưởng Dola"
+          eyebrow={t('auth.artEyebrow')}
+          title={t('auth.artTitle')}
+          quote={t('auth.artQuote')}
+          author={t('auth.artAuthor')}
           placement="left"
         />
 
@@ -118,13 +119,13 @@ export default function Login() {
             </motion.div>
 
             <motion.span variants={fadeInUp} className="font-script block text-lg italic tracking-widest text-gold-dark">
-              Chào mừng trở lại
+              {t('auth.artEyebrow')}
             </motion.span>
             <motion.h1 variants={fadeInUp} className="mt-2 font-display text-3xl font-semibold text-jade-700">
-              Đăng nhập
+              {t('auth.loginTitle')}
             </motion.h1>
             <motion.p variants={fadeInUp} className="mt-3 text-sm leading-relaxed text-ink-soft">
-              Đăng nhập để đặt bàn, theo dõi đơn hàng và nhận ưu đãi dành riêng cho thành viên Dola.
+              {t('auth.loginSubtitle')}
             </motion.p>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -142,7 +143,7 @@ export default function Login() {
               </AnimatePresence>
 
               <motion.div variants={fadeInUp}>
-                <label className="text-xs font-medium text-ink-soft">Email</label>
+                <label className="text-xs font-medium text-ink-soft">{t('auth.emailOrPhone')}</label>
                 <div className="relative mt-1.5">
                   <IconMail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-jade-700/40" />
                   <input
@@ -150,16 +151,16 @@ export default function Login() {
                     value={form.email}
                     onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))}
                     className="w-full rounded-lg border border-jade-700/15 bg-ivory-deep py-2.5 pl-10 pr-4 text-sm outline-none transition-colors focus:border-gold"
-                    placeholder="ban@email.com"
+                    placeholder={t('auth.emailPlaceholder')}
                   />
                 </div>
               </motion.div>
 
               <motion.div variants={fadeInUp}>
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-ink-soft">Mật khẩu</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('auth.password')}</label>
                   <Link to="/quen-mat-khau" className="text-xs font-medium text-gold-dark hover:underline">
-                    Quên mật khẩu?
+                    {t('auth.forgotPasswordLink')}
                   </Link>
                 </div>
                 <div className="relative mt-1.5">
@@ -169,13 +170,13 @@ export default function Login() {
                     value={form.password}
                     onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))}
                     className="w-full rounded-lg border border-jade-700/15 bg-ivory-deep py-2.5 pl-10 pr-10 text-sm outline-none transition-colors focus:border-gold"
-                    placeholder="••••••••"
+                    placeholder={t('auth.passwordPlaceholder')}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-jade-700/40 hover:text-jade-700"
-                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
                   </button>
@@ -189,14 +190,14 @@ export default function Login() {
                   className="group relative w-full overflow-hidden rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3 text-[15px] font-semibold text-jade-900 shadow-gold transition-all disabled:opacity-60"
                 >
                   <span className="absolute left-0 top-0 h-full w-full -skew-x-12 -translate-x-full bg-white/30 transition-transform duration-1000 ease-in-out group-hover:translate-x-full" />
-                  <span className="relative z-10">{loading ? 'Đang đăng nhập...' : 'Đăng nhập'}</span>
+                  <span className="relative z-10">{loading ? t('auth.loggingIn') : t('auth.loginBtn')}</span>
                 </button>
               </motion.div>
 
               <motion.p variants={fadeInUp} className="text-center text-sm text-ink-soft">
-                Chưa có tài khoản?{' '}
+                {t('auth.noAccount')}{' '}
                 <Link to="/dang-ky" className="font-semibold text-jade-700 hover:underline">
-                  Đăng ký ngay
+                  {t('auth.registerNow')}
                 </Link>
               </motion.p>
             </form>
@@ -234,7 +235,7 @@ export default function Login() {
                 onClick={clearLockedMessage}
                 className="mt-6 w-full rounded-full bg-jade-700 px-6 py-2.5 text-sm font-semibold text-ivory hover:bg-jade-600"
               >
-                Đã hiểu
+                {t('common.confirm')}
               </motion.button>
             </motion.div>
           </motion.div>

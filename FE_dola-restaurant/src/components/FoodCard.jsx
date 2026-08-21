@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom'
 import { formatVND } from '../api/foods'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function FoodCard({ food }) {
+  const { t } = useLanguage()
+
   return (
-    <div className="group overflow-hidden rounded-xl2 bg-ivory shadow-card transition-transform hover:-translate-y-1.5">
+    <div className="group overflow-hidden rounded-xl2 bg-white border border-jade-700/10 shadow-card transition-transform hover:-translate-y-1.5">
       <Link to={`/thuc-don/${food.id}`} className="relative block h-48 overflow-hidden">
         <img
           src={food.image}
@@ -15,10 +18,10 @@ export default function FoodCard({ food }) {
             food.available ? 'bg-jade-700/90 text-ivory' : 'bg-ink/70 text-ivory'
           }`}
         >
-          {food.available ? 'Còn món' : 'Hết món'}
+          {food.available ? t('menu.available') : t('menu.soldOut')}
         </span>
         {food.rating > 0 && (
-          <span className="absolute right-3 top-3 rounded-full bg-ivory/95 px-2.5 py-1 text-[11px] font-semibold text-gold-dark">
+          <span className="absolute right-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-gold-dark shadow-sm">
             ★ {food.rating}
           </span>
         )}
@@ -41,10 +44,11 @@ export default function FoodCard({ food }) {
             to={`/thuc-don/${food.id}`}
             className="text-sm font-semibold text-jade-700 underline decoration-gold decoration-2 underline-offset-4 hover:text-gold-dark"
           >
-            Xem chi tiết
+            {t('common.viewDetail')}
           </Link>
         </div>
       </div>
     </div>
   )
 }
+

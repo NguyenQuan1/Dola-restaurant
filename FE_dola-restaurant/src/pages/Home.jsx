@@ -3,9 +3,32 @@ import { Link } from 'react-router-dom'
 import { motion, useInView, animate, useScroll, useTransform, useMotionValueEvent, AnimatePresence } from 'framer-motion'
 import SectionHeading from '../components/SectionHeading'
 import FeaturedCarousel from '../components/FeaturedCarousel'
-import { promotions } from '../data/dishes'
+import { useLanguage } from '../context/LanguageContext'
 import foodService from '../api/foods'
 import { fetchReviewsByFoodId } from '../api/reviews'
+import promotionService from '../api/promotions'
+
+const formatDiscount = (promo) => {
+  if (!promo) return ''
+  if (promo.discountType === 'fixed') {
+    const value = Number(promo.discountValue)
+    return value >= 1000 ? `${Math.round(value / 1000)}K` : `${value}đ`
+  }
+  return `${Number(promo.discountValue)}%`
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const [y, m, d] = dateStr.split('-')
+  return `${d}/${m}/${y}`
+}
+
+const formatTimeRange = (start, end) => {
+  if (!start && !end) return ''
+  const trim = (t) => t?.slice(0, 5)
+  if (start && end) return `${trim(start)} - ${trim(end)}`
+  return trim(start || end)
+}
 
 // Danh sách ảnh xoay vòng cho khung ảnh chính
 const HERO_MAIN_IMAGES = [
@@ -200,7 +223,23 @@ const slideInRight = {
 export default function Home() {
   const [featuredDishes, setFeaturedDishes] = useState([])
   const [reviews, setReviews] = useState([])
+  const [promotionsList, setPromotionsList] = useState([])
   const [loading, setLoading] = useState(true)
+  const [promosLoading, setPromosLoading] = useState(true)
+  const [copiedCode, setCopiedCode] = useState('')
+  const { t } = useLanguage()
+
+  const handleCopyCode = (code) => {
+    navigator.clipboard?.writeText(code).catch(() => {})
+    setCopiedCode(code)
+    setTimeout(() => setCopiedCode(''), 1500)
+  }
+
+  const stats = [
+    { value: '12+', label: t('home.hero.statsExperience') },
+    { value: '48', label: t('home.hero.statsDishes') },
+    { value: '4.9', label: t('home.hero.statsRating') },
+  ]
 
   // State quản lý index ảnh hiển thị
   const [currentMainImgIndex, setCurrentMainImgIndex] = useState(0)
@@ -230,6 +269,7 @@ export default function Home() {
   useEffect(() => {
     let ignore = false
     setLoading(true)
+    setPromosLoading(true)
 
     const fetchDishes = foodService
       .getAll({ isFeatured: true, limit: 6 })
@@ -246,6 +286,21 @@ export default function Home() {
       })
       .catch(() => {
         if (!ignore) setReviews([])
+      })
+
+    const fetchPromos = promotionService
+      .getPublic({ limit: 6 })
+      .then((res) => {
+        if (!ignore) {
+          const list = Array.isArray(res) ? res : res?.items || []
+          setPromotionsList(list.slice(0, 3))
+        }
+      })
+      .catch(() => {
+        if (!ignore) setPromotionsList([])
+      })
+      .finally(() => {
+        if (!ignore) setPromosLoading(false)
       })
 
     Promise.all([fetchDishes, fetchReviews]).finally(() => {
@@ -301,15 +356,15 @@ export default function Home() {
               variants={fadeInUp}
               className="font-script block text-2xl italic tracking-widest text-gold-dark"
             >
-              Hương vị quê nhà
+              {t('home.hero.subtitle')}
             </motion.span>
 
             <WordByWordText
-              text="Món ăn Việt truyền thống,"
+              text={t('home.hero.titlePart1')}
               className="font-display mt-4 text-3xl font-semibold leading-tight text-jade-700 sm:text-4xl lg:text-5xl"
             />
             <WordByWordText
-              text="nấu bằng cả tấm lòng"
+              text={t('home.hero.titlePart2')}
               className="font-display mt-4 text-3xl font-semibold leading-tight text-jade-700 sm:text-4xl lg:text-5xl"
             />
 
@@ -317,8 +372,7 @@ export default function Home() {
               variants={fadeInUp}
               className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-soft"
             >
-              Dola Restaurant mang đến những món ăn quen thuộc của ba miền — từ tô phở nghi ngút
-              khói đến mâm cơm gia đình ấm áp, gìn giữ trọn vẹn hương vị truyền thống.
+              {t('home.hero.description')}
             </motion.p>
 
             <motion.div variants={fadeInUp} className="mt-8 flex flex-wrap items-center gap-4">
@@ -331,7 +385,7 @@ export default function Home() {
                   className="group relative inline-block overflow-hidden rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3.5 text-[15px] font-semibold text-jade-900 shadow-gold transition-all duration-300"
                 >
                   <span className="absolute left-0 top-0 h-full w-full -skew-x-12 -translate-x-full bg-white/30 transition-transform duration-1000 ease-in-out group-hover:translate-x-full" />
-                  <span className="relative z-10">Đặt bàn ngay</span>
+                  <span className="relative z-10">{t('home.hero.btnBook')}</span>
                 </Link>
               </motion.div>
 
@@ -340,7 +394,7 @@ export default function Home() {
                   to="/thuc-don"
                   className="inline-block rounded-full border border-jade-700/30 bg-ivory/80 px-8 py-3.5 text-[15px] font-semibold text-jade-700 backdrop-blur-sm transition-all hover:border-jade-700 hover:bg-jade-50"
                 >
-                  Xem thực đơn
+                  {t('home.hero.btnExplore')}
                 </Link>
               </motion.div>
             </motion.div>
@@ -349,7 +403,7 @@ export default function Home() {
               variants={fadeInUp}
               className="mt-12 grid max-w-md grid-cols-3 gap-6 border-t border-jade-700/10 pt-6"
             >
-              {STATS.map((s) => (
+              {stats.map((s) => (
                 <AnimatedStat key={s.label} value={s.value} label={s.label} />
               ))}
             </motion.div>
@@ -427,7 +481,7 @@ export default function Home() {
               >
                 <span className="font-display animate-pulse text-xl text-gold-dark">★ 4.9</span>
                 <span className="max-w-[7rem] text-[11px] font-medium leading-tight text-ink-soft">
-                  từ hơn 1.200 khách hàng
+                  {t('home.hero.statsGuests')}
                 </span>
               </motion.div>
             </div>
@@ -445,20 +499,20 @@ export default function Home() {
             variants={fadeInUp}
           >
             <SectionHeading
-              eyebrow="Thực đơn tuyển chọn"
-              title="Món ăn nổi bật"
-              description="Những món được khách hàng yêu thích nhất, chế biến mỗi ngày từ nguyên liệu tươi và công thức gia truyền."
+              eyebrow={t('home.featured.eyebrow')}
+              title={t('home.featured.title')}
+              description={t('home.featured.description')}
             />
           </motion.div>
 
           {loading && (
             <p className="mt-14 animate-pulse text-center text-sm text-ink-soft">
-              Đang tải món ăn nổi bật...
+              {t('home.featured.loading')}
             </p>
           )}
 
           {!loading && featuredDishes.length === 0 && (
-            <p className="mt-14 text-center text-sm text-ink-soft">Chưa có món ăn nổi bật nào.</p>
+            <p className="mt-14 text-center text-sm text-ink-soft">{t('home.featured.empty')}</p>
           )}
 
           {!loading && featuredDishes.length > 0 && (
@@ -490,7 +544,7 @@ export default function Home() {
                 to="/thuc-don"
                 className="inline-flex items-center gap-2 rounded-full border border-jade-700/25 bg-ivory px-8 py-3 text-[15px] font-semibold text-jade-700 transition-all hover:border-jade-700 hover:bg-jade-50 hover:shadow-md"
               >
-                <span>Xem toàn bộ thực đơn</span>
+                <span>{t('home.featured.viewAll')}</span>
                 <motion.span
                   animate={{ x: [0, 4, 0] }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
@@ -505,33 +559,170 @@ export default function Home() {
 
       {/* ---------------- KHUYẾN MÃI ---------------- */}
       <section className="relative overflow-hidden bg-jade-700 py-20">
+        {/* Glow hiệu ứng nền */}
+        <div className="pointer-events-none absolute -right-20 top-0 h-80 w-80 rounded-full bg-gold/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-0 h-80 w-80 rounded-full bg-gold/10 blur-3xl" />
+
         <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-10">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}>
-            <SectionHeading eyebrow="Ưu đãi hôm nay" title="Khuyến mãi dành cho bạn" light />
+            <SectionHeading eyebrow={t('home.promotions.eyebrow')} title={t('home.promotions.title')} light />
           </motion.div>
 
+          {promosLoading ? (
+            <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="animate-pulse rounded-xl2 border border-gold/20 bg-jade-600/30 p-7 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="h-5 w-20 rounded-full bg-ivory/20" />
+                    <div className="h-6 w-16 rounded-lg bg-gold/30" />
+                  </div>
+                  <div className="mt-4 h-6 w-3/4 rounded bg-ivory/20" />
+                  <div className="mt-3 space-y-2">
+                    <div className="h-4 w-full rounded bg-ivory/15" />
+                    <div className="h-4 w-4/5 rounded bg-ivory/15" />
+                  </div>
+                  <div className="mt-6 flex items-center justify-between border-t border-dashed border-gold/20 pt-4">
+                    <div className="h-4 w-24 rounded bg-ivory/15" />
+                    <div className="h-7 w-20 rounded-full bg-gold/20" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : promotionsList.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              className="mt-14 rounded-xl2 border border-gold/20 bg-jade-600/30 py-12 text-center text-ivory/80"
+            >
+              <p className="text-base">{t('home.promotions.empty') || t('promotions.noPromos')}</p>
+              <Link
+                to="/thuc-don"
+                className="mt-4 inline-block text-sm font-semibold text-gold-light hover:underline"
+              >
+                {t('home.hero.btnExplore')} →
+              </Link>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: '-60px' }}
+              variants={staggerContainer}
+              className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {promotionsList.map((p, idx) => {
+                const discount = formatDiscount(p)
+                const isCopied = copiedCode === p.code
+                const timeRange = formatTimeRange(p.startTime, p.endTime)
+
+                return (
+                  <motion.div
+                    key={p.id || idx}
+                    variants={fadeInUp}
+                    whileHover={{ y: -8, scale: 1.02 }}
+                    transition={{ duration: 0.3 }}
+                    className="group relative flex flex-col justify-between rounded-xl2 border border-gold/30 bg-jade-600/40 p-7 shadow-lg backdrop-blur-sm transition-all hover:border-gold hover:bg-jade-600/70 hover:shadow-2xl"
+                  >
+                    <div>
+                      {/* Thẻ Header Card */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-block rounded-full border border-gold/40 bg-gold/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-gold-light">
+                          {p.type || t('promotions.eyebrow')}
+                        </span>
+                        {discount && (
+                          <span className="rounded-lg bg-gradient-to-r from-gold-dark to-gold px-2.5 py-1 text-xs font-bold text-jade-900 shadow-sm">
+                            {discount} OFF
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="font-display mt-4 text-xl font-semibold text-ivory transition-colors group-hover:text-gold-light">
+                        {p.title}
+                      </h3>
+                      {p.description && (
+                        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-ivory/80">
+                          {p.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-6">
+                      {/* Đường phân cách */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-gold/30 pt-4">
+                        <div className="text-xs text-gold-light/90">
+                          {p.endDate && (
+                            <p>
+                              {t('promotions.validUntil')}: {formatDate(p.endDate)}
+                            </p>
+                          )}
+                          {timeRange && (
+                            <p className="mt-0.5 opacity-80">
+                              {timeRange}
+                            </p>
+                          )}
+                        </div>
+
+                        {p.code && (
+                          <motion.button
+                            onClick={() => handleCopyCode(p.code)}
+                            whileTap={{ scale: 0.92 }}
+                            whileHover={{ scale: 1.05 }}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-300 ${
+                              isCopied
+                                ? 'bg-gold font-bold text-jade-900 shadow-md'
+                                : 'border border-dashed border-gold/70 bg-gold/15 text-gold-light hover:bg-gold/30'
+                            }`}
+                            title={t('promotions.copied')}
+                          >
+                            {isCopied ? (
+                              <>
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                <span>{t('promotions.copied')}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-mono tracking-wider">{p.code}</span>
+                                <svg className="h-3.5 w-3.5 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                </svg>
+                              </>
+                            )}
+                          </motion.button>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </motion.div>
+          )}
+
+          {/* Nút Xem tất cả khuyến mãi */}
           <motion.div
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, margin: '-60px' }}
-            variants={staggerContainer}
-            className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-3"
+            viewport={{ once: true }}
+            variants={fadeInUp}
+            className="mt-12 text-center"
           >
-            {promotions.map((p) => (
-              <motion.div
-                key={p.title}
-                variants={fadeInUp}
-                whileHover={{ y: -8, scale: 1.02 }}
-                transition={{ duration: 0.3 }}
-                className="relative rounded-xl2 border border-gold/30 bg-jade-600/40 p-7 shadow-lg backdrop-blur-sm transition-all hover:border-gold hover:bg-jade-600/70"
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="inline-block">
+              <Link
+                to="/khuyen-mai"
+                className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/20 px-8 py-3 text-[15px] font-semibold text-gold-light backdrop-blur-sm transition-all hover:border-gold hover:bg-gold hover:text-jade-900 hover:shadow-gold"
               >
-                <span className="inline-block rounded-full border border-gold/40 bg-gold/20 px-3 py-1 text-xs font-semibold text-gold-light">
-                  {p.tag}
-                </span>
-                <h3 className="font-display mt-4 text-xl font-semibold text-ivory">{p.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ivory/80">{p.desc}</p>
-              </motion.div>
-            ))}
+                <span>{t('home.promotions.viewAll')}</span>
+                <motion.span
+                  animate={{ x: [0, 4, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                >
+                  →
+                </motion.span>
+              </Link>
+            </motion.div>
           </motion.div>
         </div>
       </section>
@@ -540,13 +731,13 @@ export default function Home() {
       <section className="bg-ivory py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}>
-            <SectionHeading eyebrow="Khách hàng nói gì" title="Đánh giá từ thực khách" />
+            <SectionHeading eyebrow={t('home.reviews.eyebrow')} title={t('home.reviews.title')} />
           </motion.div>
 
           {loading ? (
-            <p className="mt-14 animate-pulse text-center text-sm text-ink-soft">Đang tải đánh giá...</p>
+            <p className="mt-14 animate-pulse text-center text-sm text-ink-soft">{t('home.reviews.loading')}</p>
           ) : filteredReviews.length === 0 ? (
-            <p className="mt-14 text-center text-sm text-ink-soft">Chưa có đánh giá nào từ thực khách.</p>
+            <p className="mt-14 text-center text-sm text-ink-soft">{t('home.reviews.empty')}</p>
           ) : (
             <motion.div
               initial="hidden"
@@ -555,14 +746,14 @@ export default function Home() {
               variants={staggerContainer}
               className="mt-14 grid grid-cols-1 gap-8 lg:grid-cols-3"
             >
-              {filteredReviews.map((t, idx) => {
-                const authorName = t.user?.fullName || 'Thực khách'
-                const foodName = t.food?.name || 'Món ăn tại nhà hàng'
-                const ratingStars = Math.min(5, Math.max(1, Number(t.rating) || 5))
+              {filteredReviews.map((tItem, idx) => {
+                const authorName = tItem.user?.fullName || t('home.reviews.authorDefault')
+                const foodName = tItem.food?.name || t('home.reviews.dishDefault')
+                const ratingStars = Math.min(5, Math.max(1, Number(tItem.rating) || 5))
 
                 return (
                   <motion.div
-                    key={t.id || idx}
+                    key={tItem.id || idx}
                     variants={fadeInUp}
                     whileHover={{ y: -8, boxShadow: '0 15px 30px rgba(0,0,0,0.08)' }}
                     transition={{ duration: 0.3 }}
@@ -574,7 +765,7 @@ export default function Home() {
                     </div>
 
                     <p className="mt-4 text-[15px] italic leading-relaxed text-ink-soft">
-                      "{t.comment}"
+                      "{tItem.comment}"
                     </p>
 
                     <div className="mt-5 flex items-center gap-3 border-t border-jade-700/10 pt-4">
@@ -583,7 +774,7 @@ export default function Home() {
                       </span>
                       <div>
                         <p className="text-sm font-semibold text-jade-700">{authorName}</p>
-                        <p className="text-xs text-ink-soft">Đã đánh giá: {foodName}</p>
+                        <p className="text-xs text-ink-soft">{t('home.reviews.ratedFor')} {foodName}</p>
                       </div>
                     </div>
                   </motion.div>
@@ -605,26 +796,26 @@ export default function Home() {
           >
             <div className="ornament justify-start">
               <span className="font-script text-lg italic tracking-widest text-gold-dark">
-                Ghé thăm chúng tôi
+                {t('home.location.eyebrow')}
               </span>
             </div>
 
             <h2 className="font-display mt-3 text-3xl font-semibold text-jade-700 sm:text-4xl">
-              Địa chỉ &amp; giờ mở cửa
+              {t('home.location.title')}
             </h2>
 
             <ul className="mt-6 space-y-4 text-[15px] text-ink-soft">
               <li className="flex items-start gap-3">
                 <span className="mt-0.5 text-gold-dark">◆</span>
-                <span>123 Đường Trần Phú, Hải Châu, Đà Nẵng</span>
+                <span>{t('home.location.address')}</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="mt-0.5 text-gold-dark">◆</span>
-                <span>Hotline: 0905 123 456</span>
+                <span>{t('home.location.hotline')}</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="mt-0.5 text-gold-dark">◆</span>
-                <span>Mở cửa: 8:00 – 23:00 (tất cả các ngày trong tuần)</span>
+                <span>{t('home.location.hours')}</span>
               </li>
             </ul>
 
@@ -634,7 +825,7 @@ export default function Home() {
                   to="/lien-he"
                   className="inline-block rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3.5 text-[15px] font-semibold text-jade-900 shadow-gold transition-all"
                 >
-                  Chỉ đường cho tôi
+                  {t('home.location.btnDirections')}
                 </Link>
               </motion.div>
             </div>

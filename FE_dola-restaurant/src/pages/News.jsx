@@ -2,11 +2,22 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import newsService from '../api/news'
+import { useLanguage } from '../context/LanguageContext'
 
-const formatDate = (d) =>
-  d ? new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
+const formatDate = (d, lang = 'vi') => {
+  if (!d) return ''
+  try {
+    return new Date(d).toLocaleDateString(lang === 'en' ? 'en-US' : lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : lang === 'ko' ? 'ko-KR' : 'vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  } catch {
+    return ''
+  }
+}
 
-// Cấu hình các animation variants chuẩn từ trang About
+// Cấu hình các animation variants
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },
   visible: { 
@@ -27,6 +38,7 @@ const staggerContainer = {
 }
 
 export default function News() {
+  const { t, language } = useLanguage()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -35,13 +47,13 @@ export default function News() {
     let cancelled = false
     newsService.getAll({ limit: 50 })
       .then(({ items }) => { if (!cancelled) { setItems(items); setLoading(false) } })
-      .catch(() => { if (!cancelled) { setError('Không thể tải tin tức. Vui lòng thử lại.'); setLoading(false) } })
+      .catch(() => { if (!cancelled) { setError(t('news.error')); setLoading(false) } })
     return () => { cancelled = true }
   }, [])
 
   return (
     <>
-      {/* Banner chính với hiệu ứng trượt mượt xuất hiện khi load trang */}
+      {/* Banner chính */}
       <motion.section 
         initial="hidden"
         animate="visible"
@@ -49,15 +61,19 @@ export default function News() {
         className="bg-jade-700 py-16 text-center"
       >
         <motion.div variants={fadeInUp} className="mx-auto max-w-2xl px-6">
-          <span className="font-script text-lg italic tracking-widest text-gold-light">Câu chuyện ẩm thực</span>
-          <h1 className="mt-3 font-display text-4xl font-semibold text-ivory">Tin tức &amp; Blog</h1>
+          <span className="font-script text-lg italic tracking-widest text-gold-light">
+            {t('news.eyebrow')}
+          </span>
+          <h1 className="mt-3 font-display text-4xl font-semibold text-ivory">
+            {t('news.title')}
+          </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-ivory/75">
-            Cập nhật món mới, công thức nấu ăn, sự kiện và tin tức mới nhất từ Dola Restaurant.
+            {t('news.subtitle')}
           </p>
         </motion.div>
       </motion.section>
 
-      {/* Danh sách bài viết với hiệu ứng Staggered khi cuộn tới */}
+      {/* Danh sách bài viết */}
       <section className="bg-ivory py-16">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
           {loading && (
@@ -80,7 +96,7 @@ export default function News() {
           )}
 
           {!loading && !error && items.length === 0 && (
-            <p className="text-center text-sm text-ink-soft">Chưa có bài viết nào.</p>
+            <p className="text-center text-sm text-ink-soft">{t('news.empty')}</p>
           )}
 
           {!loading && !error && items.length > 0 && (
@@ -110,7 +126,9 @@ export default function News() {
                           className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" 
                         />
                       ) : (
-                        <div className="flex h-full items-center justify-center text-jade-700/30 text-sm">Chưa có ảnh</div>
+                        <div className="flex h-full items-center justify-center text-jade-700/30 text-sm">
+                          {t('order.noImage')}
+                        </div>
                       )}
                     </div>
                     
@@ -119,14 +137,14 @@ export default function News() {
                         {n.category && (
                           <span className="rounded-full bg-gold/15 px-3 py-1 font-semibold text-gold-dark">{n.category}</span>
                         )}
-                        <span className="text-ink-soft">{formatDate(n.publishedAt)}</span>
+                        <span className="text-ink-soft">{formatDate(n.publishedAt, language)}</span>
                       </div>
                       <h2 className="mt-3 font-display text-lg font-semibold leading-snug text-jade-700 group-hover:text-gold-dark transition-colors duration-200">
                         {n.title}
                       </h2>
                       <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ink-soft">{n.excerpt}</p>
                       <span className="mt-4 inline-block text-sm font-semibold text-jade-700 underline decoration-gold decoration-2 underline-offset-4">
-                        Đọc tiếp →
+                        {t('news.readMore')} →
                       </span>
                     </div>
                   </Link>

@@ -4,6 +4,7 @@ import SectionHeading from '../components/SectionHeading'
 import FoodCard from '../components/FoodCard'
 import foodService from '../api/foods'
 import { fetchPublicCategories } from '../api/categories'
+import { useLanguage } from '../context/LanguageContext'
 
 const SORT_OPTIONS = [
   { value: 'default', label: 'Mặc định' },
@@ -15,10 +16,10 @@ const SORT_OPTIONS = [
 // Cấu hình các animation variants chuẩn tương tự như trang News
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { duration: 0.8, ease: [0.25, 1, 0.5, 1] } 
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.8, ease: [0.25, 1, 0.5, 1] }
   }
 }
 
@@ -33,9 +34,17 @@ const staggerContainer = {
 }
 
 export default function Menu() {
+  const { t } = useLanguage()
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all') // GIỮ NGUYÊN — vẫn lưu theo slug
   const [sort, setSort] = useState('default')
+
+  const sortOptions = [
+    { value: 'default', label: t('menu.sortDefault') },
+    { value: 'price-asc', label: t('menu.sortPriceAsc') },
+    { value: 'price-desc', label: t('menu.sortPriceDesc') },
+    { value: 'rating-desc', label: t('menu.sortRatingDesc') },
+  ]
 
   const [categories, setCategories] = useState([])
   const [categoriesLoading, setCategoriesLoading] = useState(true)
@@ -89,7 +98,7 @@ export default function Menu() {
     }
   }, [])
 
-  const allChips = useMemo(() => [{ slug: 'all', name: 'Tất cả' }, ...categories], [categories])
+  const allChips = useMemo(() => [{ slug: 'all', name: t('menu.allCategories') }, ...categories], [categories, t])
 
   const measureRefs = useRef([])
   const [visibleCount, setVisibleCount] = useState(allChips.length)
@@ -126,8 +135,10 @@ export default function Menu() {
   const hiddenChips = allChips.slice(visibleCount)
 
   const chipClasses = (slug) =>
-    `rounded-full px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${
-      activeCategory === slug ? 'bg-jade-700 text-ivory' : 'bg-ivory text-ink-soft hover:bg-jade-50'
+    `rounded-full px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors border ${
+      activeCategory === slug
+        ? 'bg-jade-700 text-ivory border-jade-700 shadow-sm'
+        : 'bg-white text-ink-soft border-jade-700/15 hover:border-gold hover:bg-jade-50'
     }`
 
   const filtered = useMemo(() => {
@@ -147,39 +158,39 @@ export default function Menu() {
   return (
     <>
       {/* Banner chính với hiệu ứng trượt mượt xuất hiện khi load trang (Banner animation tương tự News) */}
-      <motion.section 
+      <motion.section
         initial="hidden"
         animate="visible"
         variants={staggerContainer}
         className="bg-jade-700 py-16 text-center"
       >
         <motion.div variants={fadeInUp} className="mx-auto max-w-2xl px-6">
-          <span className="font-script text-lg italic tracking-widest text-gold-light">Trọn vị ba miền</span>
-          <h1 className="mt-3 font-display text-4xl font-semibold text-ivory">Thực đơn</h1>
+          <span className="font-script text-lg italic tracking-widest text-gold-light">{t('menu.eyebrow')}</span>
+          <h1 className="mt-3 font-display text-4xl font-semibold text-ivory">{t('menu.title')}</h1>
           <p className="mt-4 text-[15px] leading-relaxed text-ivory/75">
-            Khám phá đầy đủ các món ăn của Dola Restaurant — từ phở, bún, cơm đến bánh mì và tráng miệng.
+            {t('menu.subtitle')}
           </p>
         </motion.div>
       </motion.section>
 
-      <section className="bg-ivory py-16">
+      <section className="bg-white py-16">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
           {/* BỘ LỌC */}
-          <div className="flex flex-col gap-6 rounded-xl2 bg-ivory-deep p-6 shadow-card lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-6 rounded-xl2 bg-white border border-jade-700/10 p-6 shadow-card lg:flex-row lg:items-center lg:justify-between">
             <div className="relative w-full max-w-sm">
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm món ăn..."
-                className="w-full rounded-full border border-jade-700/15 bg-ivory px-5 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold"
+                placeholder={t('menu.searchPlaceholder')}
+                className="w-full rounded-full border border-jade-700/15 bg-white px-5 py-2.5 text-sm text-ink outline-none transition-colors focus:border-gold"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-soft">⌕</span>
             </div>
 
             <div className="relative min-w-0 flex-1">
               {categoriesLoading && (
-                <span className="px-2 py-2 text-xs text-ink-soft">Đang tải danh mục...</span>
+                <span className="px-2 py-2 text-xs text-ink-soft">{t('menu.loadingCategories')}</span>
               )}
 
               {!categoriesLoading && categoriesError && (
@@ -219,11 +230,11 @@ export default function Menu() {
                       <div className="group relative">
                         <button
                           type="button"
-                          className="rounded-full bg-ivory px-4 py-2 text-xs font-semibold text-ink-soft transition-colors hover:bg-jade-50"
+                          className="rounded-full border border-jade-700/15 bg-white px-4 py-2 text-xs font-semibold text-ink-soft transition-colors hover:bg-jade-50"
                         >
                           +{hiddenChips.length}
                         </button>
-                        <div className="invisible absolute left-0 top-full z-20 mt-2 flex w-48 flex-col gap-1 rounded-xl2 bg-ivory p-2 opacity-0 shadow-card transition-opacity duration-150 group-hover:visible group-hover:opacity-100">
+                        <div className="invisible absolute left-0 top-full z-20 mt-2 flex w-48 flex-col gap-1 rounded-xl2 border border-jade-700/10 bg-white p-2 opacity-0 shadow-card transition-opacity duration-150 group-hover:visible group-hover:opacity-100">
                           {hiddenChips.map((c) => (
                             <button
                               key={c.slug}
@@ -248,11 +259,11 @@ export default function Menu() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="w-full rounded-full border border-jade-700/15 bg-ivory px-5 py-2.5 text-sm text-ink-soft outline-none focus:border-gold lg:w-auto"
+              className="w-full rounded-full border border-jade-700/15 bg-white px-5 py-2.5 text-sm text-ink-soft outline-none focus:border-gold lg:w-auto"
             >
-              {SORT_OPTIONS.map((o) => (
+              {sortOptions.map((o) => (
                 <option key={o.value} value={o.value}>
-                  Sắp xếp: {o.label}
+                  {t('menu.sortPrefix')} {o.label}
                 </option>
               ))}
             </select>
@@ -262,7 +273,7 @@ export default function Menu() {
           {foodsLoading && (
             <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="overflow-hidden rounded-xl2 bg-ivory-deep shadow-card animate-pulse">
+                <div key={i} className="overflow-hidden rounded-xl2 bg-white border border-jade-700/10 shadow-card animate-pulse">
                   <div className="h-48 bg-jade-700/10" />
                   <div className="p-6 space-y-3">
                     <div className="h-5 rounded bg-jade-700/10" />
@@ -280,12 +291,12 @@ export default function Menu() {
           {!foodsLoading && !foodsError && (
             <>
               <p className="mt-8 text-sm text-ink-soft">
-                Tìm thấy <span className="font-semibold text-jade-700">{filtered.length}</span> món ăn
+                {t('menu.foundCount', { count: filtered.length })}
               </p>
 
               {filtered.length > 0 ? (
                 /* Danh sách các thẻ món ăn sử dụng hiệu ứng Staggered + Hover Lift chuẩn như trang News */
-                <motion.div 
+                <motion.div
                   initial="hidden"
                   whileInView="visible"
                   viewport={{ once: true, margin: "-50px" }}
@@ -305,7 +316,7 @@ export default function Menu() {
                 </motion.div>
               ) : (
                 <div className="mt-16 text-center text-ink-soft">
-                  Không tìm thấy món ăn phù hợp. Vui lòng thử từ khóa hoặc bộ lọc khác.
+                  {t('menu.notFound')}
                 </div>
               )}
             </>

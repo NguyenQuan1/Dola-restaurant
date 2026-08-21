@@ -26,10 +26,6 @@ import {
     GlassWater,
     IceCreamCone,
     ImageOff,
-    Check,
-    Clock,
-    Calendar,
-    Sparkles,
 } from 'lucide-react'
 import { io } from 'socket.io-client'
 import { getTableByCode } from '../api/publicTable'
@@ -37,21 +33,14 @@ import orderService from '../api/orders'
 import foodService from '../api/foods'
 import { fetchPublicCategories } from '../api/categories'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import OrderFoodCard from '../components/OrderFoodCard'
-
-const STATUS_LABELS = {
-    pending: { label: 'Chờ xác nhận', color: 'bg-saffron-light text-saffron-dark border-saffron/30' },
-    confirmed: { label: 'Đã xác nhận', color: 'bg-gold/10 text-gold-dark border-gold/30' },
-    preparing: { label: 'Đang chuẩn bị', color: 'bg-clay-light text-clay border-clay/30' },
-    served: { label: 'Đã phục vụ', color: 'bg-jade-50 text-jade-700 border-jade-700/20' },
-    completed: { label: 'Hoàn thành', color: 'bg-teal-light text-teal border-teal/30' },
-    cancelled: { label: 'Đã hủy', color: 'bg-red-100 text-red-700 border-red-200' },
-}
+import LanguageSwitcher from '../components/LanguageSwitcher'
 
 const ACTIVE_STATUSES = ['pending', 'confirmed', 'preparing', 'served']
 const POLL_INTERVAL_MS = 10000
 
-// Icon danh mục — khớp theo slug trả về từ API, có fallback cho slug lạ
+// Icon danh mục
 const CATEGORY_ICONS = {
     'khai-vi': Soup,
     salad: Salad,
@@ -63,12 +52,12 @@ const CATEGORY_ICONS = {
     'do-uong': GlassWater,
     'trang-mieng': IceCreamCone,
 }
+
 function getCategoryIcon(slug) {
     if (slug === 'all') return Flame
     return CATEGORY_ICONS[slug] || UtensilsCrossed
 }
 
-// Cấu hình animation đồng bộ với Menu.jsx / FoodDetail.jsx
 const fadeInUp = {
     hidden: { opacity: 0, y: 30 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.25, 1, 0.5, 1] } },
@@ -86,6 +75,16 @@ function formatVnd(value) {
 export default function OrderPage() {
     const { code } = useParams()
     const { user } = useAuth()
+    const { t } = useLanguage()
+
+    const statusLabels = {
+        pending: { label: t('order.statuses.pending'), color: 'bg-saffron-light text-saffron-dark border-saffron/30' },
+        confirmed: { label: t('order.statuses.confirmed'), color: 'bg-gold/10 text-gold-dark border-gold/30' },
+        preparing: { label: t('order.statuses.preparing'), color: 'bg-clay-light text-clay border-clay/30' },
+        served: { label: t('order.statuses.served'), color: 'bg-jade-50 text-jade-700 border-jade-700/20' },
+        completed: { label: t('order.statuses.completed'), color: 'bg-teal-light text-teal border-teal/30' },
+        cancelled: { label: t('order.statuses.cancelled'), color: 'bg-red-100 text-red-700 border-red-200' },
+    }
 
     // Xác thực bàn
     const [table, setTable] = useState(null)
@@ -101,18 +100,17 @@ export default function OrderPage() {
     const [search, setSearch] = useState('')
 
     // Giỏ hàng
-    const [cart, setCart] = useState([]) // {foodId, name, price, quantity}
+    const [cart, setCart] = useState([])
     const [cartOpen, setCartOpen] = useState(false)
     const [sheetVisible, setSheetVisible] = useState(false)
     const [orderNote, setOrderNote] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [submitError, setSubmitError] = useState(null)
 
-    // Toast phản hồi nhanh (vd: thêm món vào giỏ)
+    // Toast phản hồi nhanh
     const [toast, setToast] = useState(null)
     const toastTimer = useRef(null)
 
-    // Kích hoạt hiệu ứng bounce trên thanh giỏ hàng nổi mỗi khi số lượng món thay đổi
     const [cartBumpKey, setCartBumpKey] = useState(0)
     const prevCartCountRef = useRef(0)
 
@@ -127,64 +125,102 @@ export default function OrderPage() {
             const data = await orderService.getActiveByTable(tableCode)
             setActiveOrder(data || null)
         } catch {
-            // Không chặn giao diện nếu không lấy được đơn active
+            // silent
         }
     }
 
-    const showQuickToast = (msg) => {
+    const showToast = (message) => {
+        setToast(message)
         if (toastTimer.current) clearTimeout(toastTimer.current)
-        setToast(msg)
-        toastTimer.current = setTimeout(() => setToast(null), 2500)
+        toastTimer.current = setTimeout(() => setToast(null), 2000)
     }
 
     useEffect(() => {
-        let ignore = false
+        let isMounted = true
         setTableLoading(true)
+        setTableError(null)
+
         getTableByCode(code)
             .then((data) => {
-                if (!ignore) {
+                if (isMounted) {
                     setTable(data)
                     fetchActiveOrder(code)
                 }
             })
-            .catch(() => {
-                if (!ignore) setTableError('Mã QR không hợp lệ hoặc bàn không tồn tại. Vui lòng gọi nhân viên.')
+            .catch((err) => {
+                if (isMounted) {
+                    const msg = err?.response?.data?.message || t('order.tableNotFound')
+                    setTableError(msg)
+                }
             })
             .finally(() => {
-                if (!ignore) setTableLoading(false)
+                if (isMounted) setTableLoading(false)
             })
+
         return () => {
-            ignore = true
+            isMounted = false
         }
     }, [code])
 
-    // Kết nối WebSocket thời gian thực cho bàn
+    useEffect(() => {
+        let isMounted = true
+        setFoodsLoading(true)
+        setFoodsError(null)
+
+        Promise.all([foodService.getAll({ limit: 100 }), fetchPublicCategories()])
+            .then(([foodsData, catsData]) => {
+                if (isMounted) {
+                    setFoods(foodsData)
+                    setCategories(catsData)
+                }
+            })
+            .catch((err) => {
+                if (isMounted) {
+                    setFoodsError(err?.response?.data?.message || t('order.cannotLoadMenu'))
+                }
+            })
+            .finally(() => {
+                if (isMounted) setFoodsLoading(false)
+            })
+
+        return () => {
+            isMounted = false
+        }
+    }, [])
+
+    // Polling đơn hàng
     useEffect(() => {
         if (!code) return
-        const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-        const socket = io(`${socketUrl}/orders`, {
-            transports: ['websocket', 'polling'],
-        })
+        const timer = setInterval(() => {
+            fetchActiveOrder(code)
+        }, POLL_INTERVAL_MS)
+        return () => clearInterval(timer)
+    }, [code])
+
+    // Socket.io cập nhật realtime
+    useEffect(() => {
+        if (!code) return
+        const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+        const socket = io(`${backendUrl}/orders`, { transports: ['websocket', 'polling'] })
 
         socket.on('connect', () => {
-            socket.emit('table:join', { tableCode: code })
+            socket.emit('order:join-table', { tableCode: code })
         })
 
-        socket.on('orders:updated', (data) => {
-            if (data?.table?.code === code || data?.tableCode === code) {
-                fetchActiveOrder(code)
+        socket.on('order:updated', (updatedOrder) => {
+            if (updatedOrder) {
+                setActiveOrder((prev) => {
+                    if (!prev || prev.id === updatedOrder.id) {
+                        return { ...prev, ...updatedOrder }
+                    }
+                    return prev
+                })
             }
         })
 
-        socket.on('orders:checkout', (data) => {
-            if (data?.table?.code === code || data?.tableCode === code) {
-                fetchActiveOrder(code)
-            }
-        })
-
-        socket.on('orders:payment-requested', (data) => {
-            if (data?.table?.code === code || data?.tableCode === code) {
-                fetchActiveOrder(code)
+        socket.on('order:new', (newOrder) => {
+            if (newOrder) {
+                setActiveOrder(newOrder)
             }
         })
 
@@ -193,55 +229,19 @@ export default function OrderPage() {
         }
     }, [code])
 
+    // ESC đóng giỏ hàng
     useEffect(() => {
-        if (!table) return
-        let ignore = false
-
-        Promise.all([foodService.getAll({ limit: 200 }), fetchPublicCategories()])
-            .then(([foodList, categoryList]) => {
-                if (ignore) return
-                setFoods((foodList || []).filter((f) => f.isActive !== false))
-                setCategories(categoryList || [])
-            })
-            .catch(() => {
-                if (!ignore) setFoodsError('Có lỗi khi tải thực đơn. Vui lòng thử lại.')
-            })
-            .finally(() => {
-                if (!ignore) setFoodsLoading(false)
-            })
-
-        return () => {
-            ignore = true
-        }
-    }, [table])
-
-    // Poll trạng thái làm dự phòng (fallback)
-    useEffect(() => {
-        if (!activeOrder || !ACTIVE_STATUSES.includes(activeOrder.status)) return
-
-        const interval = setInterval(() => {
-            fetchActiveOrder(code)
-        }, POLL_INTERVAL_MS)
-
-        return () => clearInterval(interval)
-    }, [activeOrder, code])
-
-    // Khóa scroll nền + cho phép đóng giỏ hàng bằng phím Escape khi bottom sheet mở
-    useEffect(() => {
-        if (!cartOpen) return
-        const prevOverflow = document.body.style.overflow
-        document.body.style.overflow = 'hidden'
         const onKeyDown = (e) => {
-            if (e.key === 'Escape') closeCart()
+            if (e.key === 'Escape' && cartOpen) {
+                closeCart()
+            }
         }
         window.addEventListener('keydown', onKeyDown)
         return () => {
-            document.body.style.overflow = prevOverflow
             window.removeEventListener('keydown', onKeyDown)
         }
     }, [cartOpen])
 
-    // Hiệu ứng trượt lên cho bottom sheet giỏ hàng (chỉ áp dụng ở mobile)
     useEffect(() => {
         if (cartOpen) {
             const raf = requestAnimationFrame(() => setSheetVisible(true))
@@ -255,19 +255,12 @@ export default function OrderPage() {
         setTimeout(() => setCartOpen(false), 200)
     }
 
-    const showToast = (message) => {
-        setToast(message)
-        if (toastTimer.current) clearTimeout(toastTimer.current)
-        toastTimer.current = setTimeout(() => setToast(null), 1600)
-    }
-
     const handleCallStaff = () => {
-        showToast('Đã gửi yêu cầu — nhân viên sẽ tới bàn ngay')
-        // TODO API: gọi endpoint thông báo nhân viên khi có, vd staffService.callToTable(code)
+        showToast(t('order.staffAlertSent'))
     }
 
-    const allChips = useMemo(() => [{ slug: 'all', name: 'Tất cả' }, ...categories], [categories])
-    const activeCategoryName = allChips.find((c) => c.slug === activeCategory)?.name || 'Món gợi ý'
+    const allChips = useMemo(() => [{ slug: 'all', name: t('order.allCategories') }, ...categories], [categories, t])
+    const activeCategoryName = allChips.find((c) => c.slug === activeCategory)?.name || t('order.menuTitle')
 
     const filteredFoods = useMemo(() => {
         let list = foods.filter((f) => f.name.toLowerCase().includes(search.trim().toLowerCase()))
@@ -299,7 +292,7 @@ export default function OrderPage() {
             }
             return [...prev, { foodId: food.id, name: food.name, price: food.price, image: food.image, quantity: qty }]
         })
-        showToast(`Đã thêm ${qty} ${food.name} vào giỏ`)
+        showToast(`+${qty} ${food.name}`)
     }
 
     const updateQty = (foodId, delta) => {
@@ -329,8 +322,9 @@ export default function OrderPage() {
             setOrderNote('')
             setSheetVisible(false)
             setTimeout(() => setCartOpen(false), 200)
+            showToast(t('order.submitSuccess'))
         } catch (err) {
-            setSubmitError(err?.response?.data?.message || 'Không gửi được đơn. Vui lòng thử lại.')
+            setSubmitError(err?.response?.data?.message || t('common.error'))
         } finally {
             setSubmitting(false)
         }
@@ -342,14 +336,13 @@ export default function OrderPage() {
         try {
             const order = await orderService.requestPayment(orderId)
             setActiveOrder(order)
+            showToast(t('order.paymentRequested'))
         } catch (err) {
-            setPaymentRequestError(err?.response?.data?.message || 'Không gửi được yêu cầu thanh toán. Vui lòng thử lại.')
+            setPaymentRequestError(err?.response?.data?.message || t('common.error'))
         } finally {
             setPaymentRequestLoading(false)
         }
     }
-
-    // -------------------- Màn hình trạng thái bàn --------------------
 
     if (tableLoading) {
         return (
@@ -367,7 +360,6 @@ export default function OrderPage() {
         )
     }
 
-    // Phần yêu cầu thanh toán — hiển thị riêng, luôn nằm dưới cùng (dưới nút "Gọi món")
     const finalBillAmount = activeOrder ? (activeOrder.finalAmount !== undefined && activeOrder.finalAmount !== null ? Number(activeOrder.finalAmount) : Number(activeOrder.totalAmount || 0)) : 0
 
     const paymentSection = activeOrder && (
@@ -380,7 +372,7 @@ export default function OrderPage() {
                         {activeOrder.paymentRequested ? (
                             <div className="flex items-center gap-1.5 text-xs font-semibold text-saffron-dark bg-saffron-light p-2.5 rounded-xl border border-saffron/30">
                                 <Loader2 size={16} className="animate-spin" />
-                                Đã gửi yêu cầu thanh toán ({formatVnd(finalBillAmount)})
+                                {t('order.paymentRequested')} ({formatVnd(finalBillAmount)})
                             </div>
                         ) : (
                             <button
@@ -394,7 +386,7 @@ export default function OrderPage() {
                                 ) : (
                                     <HandCoins size={16} />
                                 )}
-                                Yêu cầu thanh toán ({formatVnd(finalBillAmount)})
+                                {t('order.requestPayment')} ({formatVnd(finalBillAmount)})
                             </button>
                         )}
                     </div>
@@ -402,58 +394,56 @@ export default function OrderPage() {
 
             {activeOrder.paymentStatus === 'paid' && (
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-jade-700 bg-jade-50 p-2.5 rounded-xl border border-jade-700/20">
-                    <CheckCircle2 size={16} /> Hoá đơn đã được thanh toán ({formatVnd(finalBillAmount)}) - {activeOrder.paymentMethod?.toUpperCase() || 'Tại quầy'}
+                    <CheckCircle2 size={16} /> {t('order.billPaid')} ({formatVnd(finalBillAmount)})
                 </div>
             )}
         </div>
     )
 
-    // -------------------- Khối nội dung giỏ hàng (dùng chung cho panel desktop và bottom sheet mobile) --------------------
     const cartPanel = (
         <>
             <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-display text-lg font-semibold text-ink">Giỏ hàng của bạn</h2>
+                <h2 className="font-display text-lg font-semibold text-ink">{t('order.cartTitle')}</h2>
                 <button type="button" onClick={closeCart} className="text-ink-soft hover:text-ink lg:hidden">
                     <X size={20} />
                 </button>
             </div>
 
-            {/* Đơn hàng hiện tại tại bàn — hiển thị trạng thái, món đã gọi, voucher & tiền thanh toán */}
             {activeOrder && (
                 <div className="mb-4 space-y-3 rounded-xl bg-ivory-deep p-3.5 border border-jade-700/10">
                     <div className="flex items-center justify-between">
                         <div>
                             <span className="text-xs font-bold text-ink-soft uppercase tracking-wider">
-                                Hoá đơn bàn #{activeOrder.code || activeOrder.id}
+                                {t('order.billTable', { code: activeOrder.code || activeOrder.id })}
                             </span>
                             <div className="mt-1 space-y-0.5">
                                 <p className="text-xs text-ink-soft flex items-center justify-between gap-4">
-                                    <span>Tạm tính món:</span>
+                                    <span>{t('order.subtotal')}:</span>
                                     <span className="font-semibold text-ink">{formatVnd(activeOrder.totalAmount)}</span>
                                 </p>
                                 {Number(activeOrder.discountAmount) > 0 && (
                                     <p className="text-xs text-jade-700 flex items-center justify-between gap-4 font-medium">
-                                        <span>Giảm giá ({activeOrder.promotionCode}):</span>
+                                        <span>{t('order.discount')} ({activeOrder.promotionCode}):</span>
                                         <span>- {formatVnd(activeOrder.discountAmount)}</span>
                                     </p>
                                 )}
                                 <p className="text-sm font-bold text-jade-800 flex items-center justify-between gap-4 pt-1 border-t border-jade-700/10">
-                                    <span>Cần thanh toán:</span>
+                                    <span>{t('order.needPay')}:</span>
                                     <span className="text-jade-700">{formatVnd(finalBillAmount)}</span>
                                 </p>
                             </div>
                         </div>
                         <span
-                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_LABELS[activeOrder.status]?.color || 'bg-ivory text-ink-soft'
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusLabels[activeOrder.status]?.color || 'bg-ivory text-ink-soft'
                                 }`}
                         >
-                            {STATUS_LABELS[activeOrder.status]?.label || activeOrder.status}
+                            {statusLabels[activeOrder.status]?.label || activeOrder.status}
                         </span>
                     </div>
 
                     {activeOrder.note && (
                         <p className="rounded-lg border border-jade-700/10 bg-ivory px-3 py-2 text-xs text-ink-soft">
-                            <span className="font-semibold text-ink">Ghi chú: </span>
+                            <span className="font-semibold text-ink">{t('order.note')}: </span>
                             {activeOrder.note}
                         </p>
                     )}
@@ -473,7 +463,7 @@ export default function OrderPage() {
                                             onClick={() => setShowItemsDetails((prev) => !prev)}
                                             className="flex items-center justify-between w-full text-xs text-ink-soft font-medium py-1"
                                         >
-                                            <span>Danh sách món đã gọi ({displayItems.length} món)</span>
+                                            <span>{t('order.orderedDishes')} ({displayItems.length})</span>
                                             {showItemsDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                         </button>
 
@@ -490,11 +480,11 @@ export default function OrderPage() {
                                                         >
                                                             <div className="flex items-center gap-1.5 flex-1 min-w-0 pr-2">
                                                                 <span className={isCancelled ? 'line-through truncate' : 'truncate'}>
-                                                                    {item.quantity}x {item.food?.name || 'Món ăn'}
+                                                                    {item.quantity}x {item.food?.name || 'Món'}
                                                                 </span>
                                                                 {isCancelled && (
                                                                     <span className="shrink-0 rounded bg-red-100 px-1.5 py-0.2 text-[10px] font-semibold text-red-600">
-                                                                        Đã hủy
+                                                                        {t('order.cancelledItem')}
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -515,13 +505,13 @@ export default function OrderPage() {
             )}
 
             {activeOrder && (
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-soft">Gọi thêm món</p>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-soft">{t('order.addMoreDishes')}</p>
             )}
 
             {cart.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-8 text-center text-ink-soft">
                     <ShoppingCart size={28} className="opacity-40" />
-                    <p className="text-sm">Chưa có món ăn nào.</p>
+                    <p className="text-sm">{t('order.cartEmpty')}</p>
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -575,7 +565,7 @@ export default function OrderPage() {
                     <textarea
                         value={orderNote}
                         onChange={(e) => setOrderNote(e.target.value)}
-                        placeholder="Ghi chú"
+                        placeholder={t('order.notePlaceholder')}
                         rows={2}
                         className="w-full rounded-lg border border-jade-700/15 bg-ivory-deep px-3 py-2 text-sm text-ink outline-none focus:border-gold"
                     />
@@ -583,7 +573,7 @@ export default function OrderPage() {
                     {submitError && <p className="text-xs text-red-500">{submitError}</p>}
 
                     <div className="flex items-center justify-between pt-1 text-sm font-semibold text-ink">
-                        <span>Tổng cộng</span>
+                        <span>{t('order.total')}</span>
                         <span>{formatVnd(cartTotal)}</span>
                     </div>
 
@@ -595,26 +585,25 @@ export default function OrderPage() {
                     >
                         {submitting ? (
                             <span className="flex items-center justify-center gap-2">
-                                <Loader2 size={16} className="animate-spin" /> Đang gửi...
+                                <Loader2 size={16} className="animate-spin" /> {t('order.submitting')}
                             </span>
                         ) : (
-                            'Gọi món'
+                            t('order.submitOrder')
                         )}
                     </button>
                 </div>
             )}
 
-            {/* Yêu cầu thanh toán — luôn ở dưới cùng, dưới nút "Gọi món" */}
             {paymentSection}
         </>
     )
 
     return (
         <div className="min-h-screen bg-ivory pb-28 lg:pb-10">
-            {/* Thanh tiện ích: bàn / thông báo / ngôn ngữ */}
+            {/* Thanh tiện ích */}
             <div className="sticky top-0 z-30 border-b border-jade-700/10 bg-ivory/95 backdrop-blur-sm">
                 <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 lg:px-10">
-                    <Link to="#" className="flex items-center gap-2.5">
+                    <Link to="/" className="flex items-center gap-2.5">
                         <img
                             src="https://6d39pwi252.ucarecd.net/ffdbd900-1103-4034-bb75-140e28891dfe/Gemini_Generated_Image_jlcrvpjlcrvpjlcrremovebgpreview.png"
                             alt="Logo Dola Restaurant"
@@ -632,39 +621,36 @@ export default function OrderPage() {
                     >
                         <Armchair size={16} className="text-jade-700" />
                         <span className="text-left leading-tight">
-                            <span className="block text-xs font-semibold text-ink">Bàn {table.code}</span>
+                            <span className="block text-xs font-semibold text-ink">{t('order.tableInfo', { code: table.code })}</span>
                             <span className="hidden text-[10px] text-ink-soft sm:block">
-                                Tầng {table.floor} · {table.capacity} chỗ
+                                {t('order.tableDetails', { floor: table.floor, capacity: table.capacity })}
                             </span>
                         </span>
                     </button>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => showToast('Bạn chưa có thông báo mới')}
-                            className="relative text-ink-soft hover:text-jade-700 transition-colors"
+                            onClick={() => showToast(t('order.noNewNotifications'))}
+                            className="relative text-ink-soft hover:text-jade-700 transition-colors p-2"
                             aria-label="Thông báo"
                         >
                             <Bell size={19} />
-                            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500" />
+                            <span className="absolute 1.5 1.5 h-2 w-2 rounded-full bg-red-500" />
                         </button>
-                        <span className="hidden items-center gap-1 rounded-full border border-jade-700/15 px-2.5 py-1 text-xs text-ink-soft sm:flex">
-                            🇻🇳 Tiếng Việt
-                        </span>
+                        <LanguageSwitcher />
                     </div>
                 </div>
             </div>
 
-
-            {/* Bộ lọc mobile — dính lại khi cuộn, ẩn từ lg trở lên vì đã có sidebar */}
+            {/* Bộ lọc mobile */}
             <div className="lg:hidden sticky top-[49px] z-20 border-b border-jade-700/10 bg-ivory/95 pb-3 pt-4 backdrop-blur-sm">
                 <div className="mx-auto max-w-7xl px-4">
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Tìm món ăn..."
+                        placeholder={t('order.searchPlaceholder')}
                         className="w-full rounded-full border border-jade-700/15 bg-ivory-deep px-5 py-2.5 text-sm text-ink outline-none focus:border-gold shadow-sm"
                     />
 
@@ -688,9 +674,8 @@ export default function OrderPage() {
                 </div>
             </div>
 
-            {/* Bố cục chính: sidebar danh mục — lưới món — giỏ hàng (desktop) */}
+            {/* Bố cục chính */}
             <div className="mx-auto max-w-7xl px-4 pt-4 lg:px-10 lg:pt-6 flex items-start gap-6">
-                {/* Sidebar danh mục — chỉ hiện từ lg trở lên */}
                 <aside className="hidden lg:flex lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 rounded-xl2 bg-ivory-deep p-3 shadow-card sticky top-[92px]">
                     {allChips.map((c) => {
                         const Icon = getCategoryIcon(c.slug)
@@ -715,13 +700,12 @@ export default function OrderPage() {
                             className="flex w-full flex-col items-center gap-1 rounded-xl border border-gold/30 bg-saffron-light px-3 py-3 text-saffron-dark hover:bg-gold/10 transition-colors"
                         >
                             <Bell size={18} />
-                            <span className="text-xs font-semibold">Gọi nhân viên</span>
-                            <span className="text-[10px] opacity-70">Hỗ trợ nhanh chóng</span>
+                            <span className="text-xs font-semibold">{t('order.callStaff')}</span>
+                            <span className="text-[10px] opacity-70">{t('order.quickSupport')}</span>
                         </button>
                     </div>
                 </aside>
 
-                {/* Lưới món */}
                 <main className="min-w-0 flex-1">
                     <div className="mb-4 hidden items-center justify-between lg:flex">
                         <h2 className="font-display text-xl font-semibold text-jade-800">{activeCategoryName}</h2>
@@ -729,7 +713,7 @@ export default function OrderPage() {
                             type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Tìm món ăn..."
+                            placeholder={t('order.searchPlaceholder')}
                             className="w-64 rounded-full border border-jade-700/15 bg-ivory-deep px-4 py-2 text-sm text-ink outline-none focus:border-gold"
                         />
                     </div>
@@ -764,27 +748,24 @@ export default function OrderPage() {
                             {filteredFoods.length === 0 && (
                                 <div className="col-span-full flex flex-col items-center gap-2 py-10 text-center text-ink-soft">
                                     <SearchX size={28} className="opacity-50" />
-                                    <p className="text-sm">Không tìm thấy món phù hợp.</p>
+                                    <p className="text-sm">{t('order.noDishesFound')}</p>
                                 </div>
                             )}
                         </motion.div>
                     )}
                 </main>
 
-                {/* Giỏ hàng — panel cố định, đứng yên khi cuộn trang; nội dung tự cuộn bên trong nếu dài hơn màn hình */}
                 <aside className="hidden lg:block lg:w-80 lg:shrink-0 sticky top-[92px] max-h-[calc(100vh-108px)] overflow-y-auto">
                     <div className="rounded-xl2 bg-paper p-5 shadow-card border border-jade-700/10">{cartPanel}</div>
                 </aside>
             </div>
 
-            {/* Toast phản hồi nhanh */}
             {toast && (
                 <div className="fixed inset-x-0 bottom-24 lg:bottom-6 z-40 flex justify-center px-4">
                     <div className="rounded-full bg-ink px-4 py-2 text-xs font-medium text-ivory shadow-lg">{toast}</div>
                 </div>
             )}
 
-            {/* Thanh giỏ hàng nổi — chỉ trên di động, panel desktop đã luôn hiển thị */}
             {(cartCount > 0 || activeOrder) && (
                 <>
                     <style>{`
@@ -808,20 +789,20 @@ export default function OrderPage() {
                             {cartCount > 0 ? (
                                 <>
                                     <span className="flex items-center gap-2 text-sm font-semibold">
-                                        <ShoppingCart size={18} /> {cartCount} món
+                                        <ShoppingCart size={18} /> {cartCount} {t('order.dishesUnit')}
                                     </span>
                                     <span className="text-sm font-semibold">{formatVnd(cartTotal)}</span>
                                 </>
                             ) : (
                                 <>
                                     <span className="flex items-center gap-2 text-sm font-semibold">
-                                        <ShoppingCart size={18} /> Giỏ hàng của bạn
+                                        <ShoppingCart size={18} /> {t('order.cartTitle')}
                                     </span>
                                     <span
-                                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_LABELS[activeOrder.status]?.color || 'bg-ivory text-ink-soft'
+                                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusLabels[activeOrder.status]?.color || 'bg-ivory text-ink-soft'
                                             }`}
                                     >
-                                        {STATUS_LABELS[activeOrder.status]?.label || activeOrder.status}
+                                        {statusLabels[activeOrder.status]?.label || activeOrder.status}
                                     </span>
                                 </>
                             )}
@@ -830,7 +811,6 @@ export default function OrderPage() {
                 </>
             )}
 
-            {/* Bottom sheet giỏ hàng — chỉ trên di động */}
             {cartOpen && (
                 <div
                     className={`lg:hidden fixed inset-0 z-40 flex items-end bg-black/40 backdrop-blur-xs transition-opacity duration-200 ${sheetVisible ? 'opacity-100' : 'opacity-0'

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useLanguage } from '../context/LanguageContext'
 
 function FacebookIcon(props) {
   return (
@@ -33,6 +34,8 @@ const socials = [
 ]
 
 export default function Footer() {
+  const { t } = useLanguage()
+
   return (
     <footer className="bg-jade-900 text-ivory">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-6 py-16 sm:grid-cols-2 lg:grid-cols-4 lg:px-10">
@@ -49,7 +52,7 @@ export default function Footer() {
             </span>
           </Link>
           <p className="mt-4 text-sm leading-relaxed text-ivory/60">
-            Gìn giữ hương vị quê nhà qua từng món ăn — từ gánh phở sớm mai đến mâm cơm sum vầy.
+            {t('footer.tagline')}
           </p>
           <div className="mt-5 flex gap-3">
             {socials.map((item) => {
@@ -69,37 +72,37 @@ export default function Footer() {
         </div>
 
         <div>
-          <h4 className="font-display text-base font-semibold text-gold-light">Liên kết nhanh</h4>
+          <h4 className="font-display text-base font-semibold text-gold-light">{t('footer.quickLinks')}</h4>
           <ul className="mt-4 space-y-2.5 text-sm text-ivory/65">
-            <li><Link to="/gioi-thieu" className="hover:text-gold-light">Giới thiệu</Link></li>
-            <li><Link to="/thuc-don" className="hover:text-gold-light">Thực đơn</Link></li>
-            <li><Link to="/khuyen-mai" className="hover:text-gold-light">Khuyến mãi</Link></li>
-            <li><Link to="/tin-tuc" className="hover:text-gold-light">Tin tức</Link></li>
-            <li><Link to="/dat-ban" className="hover:text-gold-light">Đặt bàn</Link></li>
+            <li><Link to="/gioi-thieu" className="hover:text-gold-light">{t('nav.about')}</Link></li>
+            <li><Link to="/thuc-don" className="hover:text-gold-light">{t('nav.menu')}</Link></li>
+            <li><Link to="/khuyen-mai" className="hover:text-gold-light">{t('nav.promotions')}</Link></li>
+            <li><Link to="/tin-tuc" className="hover:text-gold-light">{t('nav.news')}</Link></li>
+            <li><Link to="/dat-ban" className="hover:text-gold-light">{t('nav.bookTable')}</Link></li>
           </ul>
         </div>
 
         <div>
-          <h4 className="font-display text-base font-semibold text-gold-light">Giờ mở cửa</h4>
+          <h4 className="font-display text-base font-semibold text-gold-light">{t('footer.openingHours')}</h4>
           <ul className="mt-4 space-y-2.5 text-sm text-ivory/65">
-            <li className="flex justify-between gap-4"><span>8:00 - 22:30 hàng ngày</span></li>
+            <li className="flex justify-between gap-4"><span>{t('footer.dailyHours')}</span></li>
           </ul>
         </div>
 
         <div>
-          <h4 className="font-display text-base font-semibold text-gold-light">Liên hệ</h4>
+          <h4 className="font-display text-base font-semibold text-gold-light">{t('footer.contactTitle')}</h4>
           <ul className="mt-4 space-y-2.5 text-sm text-ivory/65">
-            <li>123 Đường Trần Phú, Hải Châu, Đà Nẵng</li>
-            <li>Hotline: 0905 123 456</li>
-            <li>Email: hello@dolarestaurant.vn</li>
+            <li>{t('footer.address')}</li>
+            <li>{t('footer.hotline')}</li>
+            <li>{t('footer.email')}</li>
           </ul>
         </div>
       </div>
 
       <div className="border-t border-ivory/10">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-5 text-xs text-ivory/50 sm:flex-row lg:px-10">
-          <p>© {new Date().getFullYear()} Dola Restaurant. Đã đăng ký bản quyền.</p>
-          <p>Thiết kế với ❤ dành cho ẩm thực Việt</p>
+          <p>© {new Date().getFullYear()} Dola Restaurant. {t('footer.rightsReserved')}</p>
+          <p>{t('footer.madeWithLove')}</p>
         </div>
       </div>
     </footer>

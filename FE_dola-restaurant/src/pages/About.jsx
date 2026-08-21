@@ -1,40 +1,21 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import SectionHeading from '../components/SectionHeading'
+import { useLanguage } from '../context/LanguageContext'
 
-const TIMELINE = [
-  { year: '2014', text: 'Khởi đầu là một gánh phở nhỏ trên con phố cổ Hà Nội, phục vụ những tô phở gia truyền ba đời.' },
-  { year: '2019', text: 'Mở rộng thành nhà hàng đầu tiên tại Đà Nẵng, mang theo trọn vẹn công thức truyền thống của gia đình.' },
-  { year: '2023', text: 'Ra mắt thực đơn ba miền, quy tụ tinh hoa ẩm thực Bắc - Trung - Nam trong một không gian.' },
-  { year: '2026', text: 'Dola Restaurant trở thành điểm đến quen thuộc của hơn 1.200 thực khách mỗi tháng.' },
+const CHEF_IMAGES = [
+  'https://images.unsplash.com/photo-1583394293214-28ded15ee548?q=80&w=600&auto=format&fit=crop',
+  'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTD_xyE0rUc9KlQQEjmHA4_-cAQ3hFJhBuXF_4f0YbzpA&s=10',
+  'https://images.unsplash.com/photo-1622021142947-da7dedc7c39a?q=80&w=600&auto=format&fit=crop',
 ]
 
-const CHEFS = [
-  {
-    name: 'Đầu bếp Lê Văn Thành',
-    role: 'Bếp trưởng điều hành',
-    image: 'https://images.unsplash.com/photo-1583394293214-28ded15ee548?q=80&w=600&auto=format&fit=crop',
-    desc: 'Hơn 20 năm kinh nghiệm với ẩm thực miền Bắc, người gìn giữ công thức nước dùng phở gia truyền.',
-  },
-  {
-    name: 'Đầu bếp Trần Thị Mai',
-    role: 'Bếp trưởng món Huế',
-    image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTD_xyE0rUc9KlQQEjmHA4_-cAQ3hFJhBuXF_4f0YbzpA&s=10',
-    desc: 'Sinh ra tại Huế, mang đến hương vị cay nồng đặc trưng của ẩm thực cố đô.',
-  },
-  {
-    name: 'Đầu bếp Phạm Quốc Bảo',
-    role: 'Bếp trưởng món Nam',
-    image: 'https://images.unsplash.com/photo-1622021142947-da7dedc7c39a?q=80&w=600&auto=format&fit=crop',
-    desc: 'Chuyên gia về các món cơm và bánh mì phong cách Sài Gòn phóng khoáng.',
-  },
-]
-
-const MISSION = [
-  { title: 'Nguyên liệu tươi mỗi ngày', desc: 'Lựa chọn kỹ càng từ các chợ đầu mối uy tín, chế biến trong ngày.' },
-  { title: 'Công thức gia truyền', desc: 'Gìn giữ hương vị nguyên bản qua nhiều thế hệ đầu bếp.' },
-  { title: 'Không gian ấm cúng', desc: 'Thiết kế mang hơi thở Đông Dương, gần gũi như bữa cơm gia đình.' },
-  { title: 'Phục vụ tận tâm', desc: 'Đội ngũ nhân viên thân thiện, chu đáo trong từng chi tiết nhỏ.' },
+const SPACE_IMAGES = [
+  'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1424847651672-bf20a4b0982b?q=80&w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1592861956120-e524fc739696?q=80&w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?q=80&w=800&auto=format&fit=crop',
 ]
 
 // Định nghĩa các cấu hình animation tái sử dụng (Variants)
@@ -58,6 +39,12 @@ const staggerContainer = {
 }
 
 export default function About() {
+  const { t } = useLanguage()
+
+  const timeline = t('about.timeline') || []
+  const chefs = t('about.chefs') || []
+  const missions = t('about.missions') || []
+
   return (
     <>
       {/* HERO SECTION - Hiệu ứng xuất hiện mượt mà khi load trang */}
@@ -69,13 +56,14 @@ export default function About() {
       >
         <div className="pointer-events-none absolute -left-20 top-0 h-64 w-64 rounded-full bg-gold-light/10 blur-3xl" />
         <motion.div variants={fadeInUp} className="relative mx-auto max-w-3xl px-6">
-          <span className="font-script text-lg italic tracking-widest text-gold-light">Câu chuyện của chúng tôi</span>
+          <span className="font-script text-lg italic tracking-widest text-gold-light">
+            {t('about.eyebrow')}
+          </span>
           <h1 className="mt-3 font-display text-4xl font-semibold text-ivory sm:text-5xl">
-            Giới thiệu Dola Restaurant
+            {t('about.title')}
           </h1>
           <p className="mt-5 text-[15px] leading-relaxed text-ivory/75">
-            Hơn một thập kỷ gìn giữ hương vị quê nhà — từ gánh phở sớm mai đến mâm cơm sum vầy, Dola
-            luôn trân trọng từng nguyên liệu và câu chuyện ẩn sau mỗi món ăn Việt.
+            {t('about.subtitle')}
           </p>
         </motion.div>
       </motion.section>
@@ -91,24 +79,24 @@ export default function About() {
               variants={staggerContainer}
             >
               <motion.div variants={fadeInUp} className="ornament justify-start">
-                <span className="font-script text-lg italic tracking-widest text-gold-dark">Hành trình</span>
+                <span className="font-script text-lg italic tracking-widest text-gold-dark">
+                  {t('about.historyEyebrow')}
+                </span>
               </motion.div>
               <motion.h2 variants={fadeInUp} className="mt-3 font-display text-3xl font-semibold text-jade-700 sm:text-4xl">
-                Lịch sử hình thành
+                {t('about.historyTitle')}
               </motion.h2>
               <motion.p variants={fadeInUp} className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-soft">
-                Dola Restaurant được sáng lập bởi một gia đình có truyền thống nấu phở ba đời tại Hà Nội.
-                Với mong muốn lan tỏa hương vị quê hương đến nhiều thực khách hơn, Dola đã không ngừng
-                phát triển và mở rộng thực đơn của mình.
+                {t('about.historyDesc')}
               </motion.p>
               
               {/* Cột mốc Timeline xuất hiện tuần tự */}
               <motion.ol variants={staggerContainer} className="mt-8 space-y-6 border-l-2 border-gold/40 pl-6">
-                {TIMELINE.map((t) => (
-                  <motion.li key={t.year} variants={fadeInUp} className="relative">
+                {Array.isArray(timeline) && timeline.map((item) => (
+                  <motion.li key={item.year} variants={fadeInUp} className="relative">
                     <span className="absolute -left-[31px] flex h-4 w-4 items-center justify-center rounded-full bg-gold" />
-                    <p className="font-display text-lg font-semibold text-jade-700">{t.year}</p>
-                    <p className="mt-1 text-sm leading-relaxed text-ink-soft">{t.text}</p>
+                    <p className="font-display text-lg font-semibold text-jade-700">{item.year}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-ink-soft">{item.text}</p>
                   </motion.li>
                 ))}
               </motion.ol>
@@ -151,9 +139,9 @@ export default function About() {
       <section className="bg-ivory-deep py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
           <SectionHeading
-            eyebrow="Trải nghiệm"
-            title="Không gian nhà hàng"
-            description="Sự giao thoa giữa nét truyền thống Đông Dương và tiện nghi hiện đại, tạo nên một không gian ấm cúng cho mọi bữa ăn."
+            eyebrow={t('about.spaceEyebrow')}
+            title={t('about.spaceTitle')}
+            description={t('about.spaceDesc')}
           />
           <motion.div 
             initial="hidden"
@@ -162,14 +150,7 @@ export default function About() {
             variants={staggerContainer}
             className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
           >
-            {[
-              'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800&auto=format&fit=crop',
-              'https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=800&auto=format&fit=crop',
-              'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=800&auto=format&fit=crop',
-              'https://images.unsplash.com/photo-1424847651672-bf20a4b0982b?q=80&w=800&auto=format&fit=crop',
-              'https://images.unsplash.com/photo-1592861956120-e524fc739696?q=80&w=800&auto=format&fit=crop',
-              'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?q=80&w=800&auto=format&fit=crop',
-            ].map((src, i) => (
+            {SPACE_IMAGES.map((src, i) => (
               <motion.div 
                 key={i} 
                 variants={fadeInUp}
@@ -177,7 +158,7 @@ export default function About() {
               >
                 <img 
                   src={src} 
-                  alt={`Không gian Dola ${i + 1}`} 
+                  alt={`Dola ${i + 1}`} 
                   className="h-56 w-full object-cover transition-all duration-700 hover:scale-110 hover:opacity-90" 
                 />
               </motion.div>
@@ -189,7 +170,7 @@ export default function About() {
       {/* ĐẦU BẾP SECTION - Card nhấc lên nhẹ khi di chuột vào (Hover interaction) */}
       <section className="bg-ivory py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
-          <SectionHeading eyebrow="Những người tạo nên hương vị" title="Đội ngũ đầu bếp" />
+          <SectionHeading eyebrow={t('about.chefsEyebrow')} title={t('about.chefsTitle')} />
           <motion.div 
             initial="hidden"
             whileInView="visible"
@@ -197,14 +178,14 @@ export default function About() {
             variants={staggerContainer}
             className="mt-14 grid grid-cols-1 gap-8 sm:grid-cols-3"
           >
-            {CHEFS.map((c) => (
+            {Array.isArray(chefs) && chefs.map((c, i) => (
               <motion.div 
-                key={c.name} 
+                key={c.name || i} 
                 variants={fadeInUp}
                 whileHover={{ y: -10, transition: { duration: 0.3 } }}
                 className="overflow-hidden rounded-xl2 bg-ivory-deep shadow-card border border-transparent hover:border-gold/30"
               >
-                <img src={c.image} alt={c.name} className="h-64 w-full object-cover" />
+                <img src={CHEF_IMAGES[i % CHEF_IMAGES.length]} alt={c.name} className="h-64 w-full object-cover" />
                 <div className="p-6 text-center">
                   <h3 className="font-display text-lg font-semibold text-jade-700">{c.name}</h3>
                   <p className="mt-1 text-xs font-medium uppercase tracking-wide text-gold-dark">{c.role}</p>
@@ -219,7 +200,7 @@ export default function About() {
       {/* SỨ MỆNH SECTION - Card lật mượt và nút CTA thu hút tương tác */}
       <section className="bg-jade-700 py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
-          <SectionHeading eyebrow="Điều chúng tôi theo đuổi" title="Sứ mệnh của Dola" light />
+          <SectionHeading eyebrow={t('about.missionEyebrow')} title={t('about.missionTitle')} light />
           <motion.div 
             initial="hidden"
             whileInView="visible"
@@ -227,9 +208,9 @@ export default function About() {
             variants={staggerContainer}
             className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4"
           >
-            {MISSION.map((m) => (
+            {Array.isArray(missions) && missions.map((m, idx) => (
               <motion.div 
-                key={m.title} 
+                key={m.title || idx} 
                 variants={fadeInUp}
                 whileHover={{ scale: 1.03, backgroundColor: 'rgba(5, 150, 105, 0.3)' }}
                 className="rounded-xl2 border border-gold/25 bg-jade-600/40 p-7 text-center transition-colors duration-300"
@@ -257,7 +238,7 @@ export default function About() {
                 to="/dat-ban"
                 className="inline-flex rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3.5 text-[15px] font-semibold text-jade-900 shadow-gold transition-shadow duration-300 hover:shadow-lg"
               >
-                Đặt bàn trải nghiệm ngay
+                {t('about.ctaBook')}
               </Link>
             </motion.div>
           </motion.div>

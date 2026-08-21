@@ -2,24 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { changePassword as changePasswordApi, getHistory, updateProfile as updateProfileApi } from '../api/auth'
 import { cancelMyReservation } from '../api/reservations'
 import CancelReservationModal from '../components/CancelReservationModal'
-
-const TABS = [
-  { key: 'profile', label: 'Thông tin cá nhân' },
-  { key: 'reservations', label: 'Lịch sử đặt bàn' },
-  { key: 'password', label: 'Đổi mật khẩu' },
-]
-
-const STATUS_LABEL = {
-  pending: 'Chờ xác nhận',
-  confirmed: 'Đã xác nhận',
-  seated: 'Đã nhận bàn',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-  no_show: 'Không đến',
-}
 
 const STATUS_COLOR = {
   pending: 'bg-gold/15 text-gold-dark',
@@ -42,6 +28,23 @@ const staggerContainer = {
 
 export default function Account() {
   const { user, isAuthenticated, updateProfile, logout, refreshProfile } = useAuth()
+  const { t } = useLanguage()
+
+  const tabs = [
+    { key: 'profile', label: t('account.tabs.profile') },
+    { key: 'reservations', label: t('account.tabs.reservations') },
+    { key: 'password', label: t('account.tabs.password') },
+  ]
+
+  const statusLabel = {
+    pending: t('account.statuses.pending'),
+    confirmed: t('account.statuses.confirmed'),
+    seated: t('account.statuses.seated'),
+    completed: t('account.statuses.completed'),
+    cancelled: t('account.statuses.cancelled'),
+    no_show: t('account.statuses.no_show'),
+  }
+
   const [tab, setTab] = useState('profile')
   const [profile, setProfile] = useState({ fullName: user?.fullName || '', email: user?.email || '', phone: user?.phone || '' })
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
@@ -82,12 +85,12 @@ export default function Account() {
     setCancelLoading(true)
     try {
       await cancelMyReservation(id, reason)
-      setSavedMsg('Đã hủy đặt bàn thành công')
+      setSavedMsg(t('account.cancelSuccess'))
       setTimeout(() => setSavedMsg(''), 3000)
       fetchUserHistory()
       closeCancelModal()
     } catch (err) {
-      setSavedMsg(err.response?.data?.message || 'Không thể hủy đặt bàn')
+      setSavedMsg(err.response?.data?.message || t('common.error'))
       setTimeout(() => setSavedMsg(''), 4000)
     } finally {
       setCancelLoading(false)
@@ -99,9 +102,9 @@ export default function Account() {
     try {
       const { data } = await updateProfileApi(profile)
       updateProfile(data)
-      setSavedMsg('Đã cập nhật thông tin cá nhân')
+      setSavedMsg(t('account.updateSuccess'))
     } catch (err) {
-      const message = err?.response?.data?.message || 'Không thể cập nhật hồ sơ'
+      const message = err?.response?.data?.message || t('common.error')
       setSavedMsg(message)
     }
     setTimeout(() => setSavedMsg(''), 2500)
@@ -110,19 +113,19 @@ export default function Account() {
   const changePassword = async (e) => {
     e.preventDefault()
     if (passwordForm.next.length < 6) {
-      setSavedMsg('Mật khẩu mới cần tối thiểu 6 ký tự')
+      setSavedMsg(t('auth.errMinPassword'))
       return
     }
     if (passwordForm.next !== passwordForm.confirm) {
-      setSavedMsg('Mật khẩu xác nhận không khớp')
+      setSavedMsg(t('auth.errMismatchPassword'))
       return
     }
     try {
       await changePasswordApi({ currentPassword: passwordForm.current, newPassword: passwordForm.next })
       setPasswordForm({ current: '', next: '', confirm: '' })
-      setSavedMsg('Đổi mật khẩu thành công')
+      setSavedMsg(t('account.passwordSuccess'))
     } catch (err) {
-      const message = err?.response?.data?.message || 'Không thể đổi mật khẩu'
+      const message = err?.response?.data?.message || t('common.error')
       setSavedMsg(message)
     }
     setTimeout(() => setSavedMsg(''), 2500)
@@ -143,16 +146,16 @@ export default function Account() {
             transition={{ boxShadow: { duration: 3, repeat: Infinity, ease: 'easeInOut' } }}
             className="flex h-16 w-16 items-center justify-center rounded-full bg-jade-700 font-display text-2xl text-gold-light"
           >
-            {user.fullName[0]}
+            {user?.fullName ? user.fullName[0] : 'U'}
           </motion.span>
           <motion.h1 variants={fadeInUp} className="font-display text-2xl font-semibold text-jade-700">
-            {user.fullName}
+            {user?.fullName || t('account.title')}
           </motion.h1>
           <motion.p variants={fadeInUp} className="text-sm text-ink-soft">
-            {user.email}
+            {user?.email}
           </motion.p>
           <motion.button variants={fadeInUp} onClick={logout} className="mt-1 text-xs font-semibold text-lacquer hover:underline">
-            Đăng xuất
+            {t('auth.logout')}
           </motion.button>
         </motion.div>
 
@@ -164,22 +167,22 @@ export default function Account() {
         >
           {/* TABS */}
           <motion.div variants={fadeInUp} className="flex flex-row gap-2 overflow-x-auto lg:flex-col">
-            {TABS.map((t) => (
+            {tabs.map((tItem) => (
               <button
-                key={t.key}
-                onClick={() => { setTab(t.key); setSavedMsg('') }}
+                key={tItem.key}
+                onClick={() => { setTab(tItem.key); setSavedMsg('') }}
                 className={`relative whitespace-nowrap rounded-full px-5 py-2.5 text-left text-sm font-semibold transition-colors lg:rounded-lg ${
-                  tab === t.key ? 'text-ivory' : 'bg-ivory-deep text-ink-soft hover:bg-jade-50'
+                  tab === tItem.key ? 'text-ivory' : 'bg-ivory-deep text-ink-soft hover:bg-jade-50'
                 }`}
               >
-                {tab === t.key && (
+                {tab === tItem.key && (
                   <motion.span
                     layoutId="account-tab-active"
                     transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                     className="absolute inset-0 rounded-full bg-jade-700 lg:rounded-lg"
                   />
                 )}
-                <span className="relative z-10">{t.label}</span>
+                <span className="relative z-10">{tItem.label}</span>
               </button>
             ))}
           </motion.div>
@@ -211,7 +214,7 @@ export default function Account() {
                   className="space-y-4 rounded-xl2 bg-ivory-deep p-6 shadow-card sm:p-8"
                 >
                   <div>
-                    <label className="text-xs font-medium text-ink-soft">Họ và tên</label>
+                    <label className="text-xs font-medium text-ink-soft">{t('auth.fullName')}</label>
                     <input
                       value={profile.fullName}
                       onChange={(e) => setProfile((v) => ({ ...v, fullName: e.target.value }))}
@@ -219,7 +222,7 @@ export default function Account() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-ink-soft">Email</label>
+                    <label className="text-xs font-medium text-ink-soft">{t('auth.emailOrPhone')}</label>
                     <input
                       value={profile.email}
                       onChange={(e) => setProfile((v) => ({ ...v, email: e.target.value }))}
@@ -227,7 +230,7 @@ export default function Account() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-ink-soft">Số điện thoại</label>
+                    <label className="text-xs font-medium text-ink-soft">{t('auth.phone')}</label>
                     <input
                       value={profile.phone}
                       onChange={(e) => setProfile((v) => ({ ...v, phone: e.target.value }))}
@@ -240,7 +243,7 @@ export default function Account() {
                     type="submit"
                     className="rounded-full bg-jade-700 px-7 py-2.5 text-sm font-semibold text-ivory hover:bg-jade-600"
                   >
-                    Lưu thay đổi
+                    {t('account.saveProfile')}
                   </motion.button>
                 </motion.form>
               )}
@@ -256,7 +259,7 @@ export default function Account() {
                 >
                   {(!history.reservations || history.reservations.length === 0) && (
                     <p className="rounded-xl2 bg-ivory-deep p-6 text-center text-sm text-ink-soft shadow-card">
-                      Bạn chưa có lịch đặt bàn nào.
+                      {t('account.noReservations')}
                     </p>
                   )}
 
@@ -269,15 +272,15 @@ export default function Account() {
                         className="flex flex-wrap items-center justify-between gap-3 rounded-xl2 bg-ivory-deep p-5 shadow-card transition-shadow hover:shadow-md"
                       >
                         <div>
-                          <p className="font-display text-base font-semibold text-jade-700">Mã đơn #{r.id}</p>
-                          <p className="mt-1 text-sm text-ink-soft">{r.date} lúc {r.time} · {r.guests} khách</p>
+                          <p className="font-display text-base font-semibold text-jade-700">{t('account.table')} #{r.id}</p>
+                          <p className="mt-1 text-sm text-ink-soft">{r.date} lúc {r.time} · {r.guests} {t('account.guests')}</p>
                           {r.cancelReason && (
-                            <p className="mt-1 text-xs italic text-lacquer">Lý do hủy: {r.cancelReason}</p>
+                            <p className="mt-1 text-xs italic text-lacquer">Lý do: {r.cancelReason}</p>
                           )}
                         </div>
                         <div className="flex items-center gap-3">
                           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLOR[r.status] || 'bg-gold/15 text-gold-dark'}`}>
-                            {STATUS_LABEL[r.status] || r.status}
+                            {statusLabel[r.status] || r.status}
                           </span>
                           {(r.status === 'pending' || r.status === 'confirmed') && (
                             <motion.button
@@ -287,7 +290,7 @@ export default function Account() {
                               onClick={() => openCancelModal(r)}
                               className="rounded-full border border-lacquer/30 px-3 py-1 text-xs font-semibold text-lacquer hover:bg-lacquer/10"
                             >
-                              Hủy đặt bàn
+                              {t('account.cancelBtn')}
                             </motion.button>
                           )}
                         </div>
@@ -296,7 +299,7 @@ export default function Account() {
                   </motion.div>
 
                   <Link to="/dat-ban" className="inline-block text-sm font-semibold text-jade-700 underline decoration-gold underline-offset-4">
-                    + Đặt bàn mới
+                    + {t('account.bookNow')}
                   </Link>
                 </motion.div>
               )}
@@ -312,7 +315,7 @@ export default function Account() {
                   className="space-y-4 rounded-xl2 bg-ivory-deep p-6 shadow-card sm:p-8"
                 >
                   <div>
-                    <label className="text-xs font-medium text-ink-soft">Mật khẩu hiện tại</label>
+                    <label className="text-xs font-medium text-ink-soft">{t('account.currentPassword')}</label>
                     <input
                       type="password"
                       value={passwordForm.current}
@@ -321,7 +324,7 @@ export default function Account() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-ink-soft">Mật khẩu mới</label>
+                    <label className="text-xs font-medium text-ink-soft">{t('account.newPassword')}</label>
                     <input
                       type="password"
                       value={passwordForm.next}
@@ -330,7 +333,7 @@ export default function Account() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-ink-soft">Xác nhận mật khẩu mới</label>
+                    <label className="text-xs font-medium text-ink-soft">{t('account.confirmNewPassword')}</label>
                     <input
                       type="password"
                       value={passwordForm.confirm}
@@ -344,7 +347,7 @@ export default function Account() {
                     type="submit"
                     className="rounded-full bg-jade-700 px-7 py-2.5 text-sm font-semibold text-ivory hover:bg-jade-600"
                   >
-                    Đổi mật khẩu
+                    {t('account.savePassword')}
                   </motion.button>
                 </motion.form>
               )}

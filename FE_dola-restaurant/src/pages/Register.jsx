@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import AuthArt from '../components/AuthArt'
 
 function IconUser(props) {
@@ -58,7 +59,6 @@ function IconEyeOff(props) {
   )
 }
 
-// Cùng bộ variants với Home.jsx
 const fadeInUp = {
   hidden: { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.215, 0.61, 0.355, 1] } },
@@ -71,6 +71,7 @@ const staggerContainer = {
 
 export default function Register() {
   const { register } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', confirmPassword: '' })
   const [errors, setErrors] = useState({})
@@ -82,11 +83,11 @@ export default function Register() {
 
   const validate = () => {
     const err = {}
-    if (!form.fullName.trim()) err.fullName = 'Vui lòng nhập họ tên'
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) err.email = 'Email không hợp lệ'
-    if (!/^0\d{9}$/.test(form.phone.trim())) err.phone = 'Số điện thoại không hợp lệ'
-    if (form.password.length < 6) err.password = 'Mật khẩu cần tối thiểu 6 ký tự'
-    if (form.confirmPassword !== form.password) err.confirmPassword = 'Mật khẩu xác nhận không khớp'
+    if (!form.fullName.trim()) err.fullName = t('auth.errNameRequired')
+    if (!/^\S+@\S+\.\S+$/.test(form.email)) err.email = t('auth.errInvalidEmail')
+    if (!/^0\d{9}$/.test(form.phone.trim())) err.phone = t('auth.errInvalidPhone')
+    if (form.password.length < 6) err.password = t('auth.errMinPassword')
+    if (form.confirmPassword !== form.password) err.confirmPassword = t('auth.errMismatchPassword')
     setErrors(err)
     return Object.keys(err).length === 0
   }
@@ -100,7 +101,7 @@ export default function Register() {
       await register(form)
       navigate('/tai-khoan')
     } catch (err) {
-      const message = err?.response?.data?.message || 'Đăng ký thất bại, vui lòng thử lại'
+      const message = err?.response?.data?.message || t('auth.errRegisterFailed')
       setErrors({ form: message })
     } finally {
       setLoading(false)
@@ -109,7 +110,7 @@ export default function Register() {
 
   return (
     <section className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,_#fdf8ef_0%,_#f7efe2_100%)]">
-      {/* Glow bập bùng — cùng ngôn ngữ hiệu ứng với hero trang chủ */}
+      {/* Glow bập bùng */}
       <motion.div
         animate={{ scale: [1, 1.2, 1], opacity: [0.25, 0.45, 0.25] }}
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
@@ -123,10 +124,10 @@ export default function Register() {
 
       <div className="relative z-10 flex min-h-screen flex-col lg:flex-row-reverse">
         <AuthArt
-          eyebrow="Gia nhập Dola"
-          title="Thành viên Dola được ưu tiên giữ bàn và nhận ưu đãi riêng."
-          quote="Từ bữa cơm gia đình đến buổi tiệc quan trọng, Dola luôn có một chỗ dành cho bạn."
-          author="Đội ngũ Dola"
+          eyebrow={t('auth.registerArtEyebrow')}
+          title={t('auth.registerArtTitle')}
+          quote={t('auth.artQuote')}
+          author={t('auth.artAuthor')}
           placement="right"
         />
 
@@ -147,13 +148,13 @@ export default function Register() {
             </motion.div>
 
             <motion.span variants={fadeInUp} className="font-script block text-lg italic tracking-widest text-gold-dark">
-              Gia nhập Dola
+              {t('auth.registerArtEyebrow')}
             </motion.span>
             <motion.h1 variants={fadeInUp} className="mt-2 font-display text-3xl font-semibold text-jade-700">
-              Đăng ký tài khoản
+              {t('auth.registerTitle')}
             </motion.h1>
             <motion.p variants={fadeInUp} className="mt-3 text-sm leading-relaxed text-ink-soft">
-              Tạo tài khoản để đặt bàn nhanh hơn, lưu lịch sử đơn hàng và nhận ưu đãi thành viên.
+              {t('auth.registerSubtitle')}
             </motion.p>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -171,13 +172,14 @@ export default function Register() {
               </AnimatePresence>
 
               <motion.div variants={fadeInUp}>
-                <label className="text-xs font-medium text-ink-soft">Họ và tên</label>
+                <label className="text-xs font-medium text-ink-soft">{t('auth.fullName')}</label>
                 <div className="relative mt-1.5">
                   <IconUser className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-jade-700/40" />
                   <input
                     value={form.fullName}
                     onChange={handleChange('fullName')}
                     className="w-full rounded-lg border border-jade-700/15 bg-ivory-deep py-2.5 pl-10 pr-4 text-sm outline-none transition-colors focus:border-gold"
+                    placeholder={t('auth.fullNamePlaceholder')}
                   />
                 </div>
                 {errors.fullName && <p className="mt-1 text-xs text-lacquer">{errors.fullName}</p>}
@@ -185,7 +187,7 @@ export default function Register() {
 
               <motion.div variants={fadeInUp} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Email</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('auth.emailOrPhone')}</label>
                   <div className="relative mt-1.5">
                     <IconMail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-jade-700/40" />
                     <input
@@ -193,18 +195,20 @@ export default function Register() {
                       value={form.email}
                       onChange={handleChange('email')}
                       className="w-full rounded-lg border border-jade-700/15 bg-ivory-deep py-2.5 pl-10 pr-4 text-sm outline-none transition-colors focus:border-gold"
+                      placeholder={t('auth.emailPlaceholder')}
                     />
                   </div>
                   {errors.email && <p className="mt-1 text-xs text-lacquer">{errors.email}</p>}
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Số điện thoại</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('auth.phone')}</label>
                   <div className="relative mt-1.5">
                     <IconPhone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-jade-700/40" />
                     <input
                       value={form.phone}
                       onChange={handleChange('phone')}
                       className="w-full rounded-lg border border-jade-700/15 bg-ivory-deep py-2.5 pl-10 pr-4 text-sm outline-none transition-colors focus:border-gold"
+                      placeholder={t('auth.phonePlaceholder')}
                     />
                   </div>
                   {errors.phone && <p className="mt-1 text-xs text-lacquer">{errors.phone}</p>}
@@ -213,7 +217,7 @@ export default function Register() {
 
               <motion.div variants={fadeInUp} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Mật khẩu</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('auth.password')}</label>
                   <div className="relative mt-1.5">
                     <IconLock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-jade-700/40" />
                     <input
@@ -221,12 +225,13 @@ export default function Register() {
                       value={form.password}
                       onChange={handleChange('password')}
                       className="w-full rounded-lg border border-jade-700/15 bg-ivory-deep py-2.5 pl-10 pr-10 text-sm outline-none transition-colors focus:border-gold"
+                      placeholder={t('auth.passwordPlaceholder')}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-jade-700/40 hover:text-jade-700"
-                      aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
                     </button>
@@ -234,7 +239,7 @@ export default function Register() {
                   {errors.password && <p className="mt-1 text-xs text-lacquer">{errors.password}</p>}
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-ink-soft">Xác nhận mật khẩu</label>
+                  <label className="text-xs font-medium text-ink-soft">{t('auth.confirmPassword')}</label>
                   <div className="relative mt-1.5">
                     <IconLock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-jade-700/40" />
                     <input
@@ -242,12 +247,13 @@ export default function Register() {
                       value={form.confirmPassword}
                       onChange={handleChange('confirmPassword')}
                       className="w-full rounded-lg border border-jade-700/15 bg-ivory-deep py-2.5 pl-10 pr-10 text-sm outline-none transition-colors focus:border-gold"
+                      placeholder={t('auth.confirmPasswordPlaceholder')}
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirm((v) => !v)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-jade-700/40 hover:text-jade-700"
-                      aria-label={showConfirm ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                      aria-label={showConfirm ? 'Hide password' : 'Show password'}
                     >
                       {showConfirm ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
                     </button>
@@ -263,14 +269,14 @@ export default function Register() {
                   className="group relative w-full overflow-hidden rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3 text-[15px] font-semibold text-jade-900 shadow-gold transition-all disabled:opacity-60"
                 >
                   <span className="absolute left-0 top-0 h-full w-full -skew-x-12 -translate-x-full bg-white/30 transition-transform duration-1000 ease-in-out group-hover:translate-x-full" />
-                  <span className="relative z-10">{loading ? 'Đang tạo tài khoản...' : 'Đăng ký'}</span>
+                  <span className="relative z-10">{loading ? t('auth.registering') : t('auth.registerBtn')}</span>
                 </button>
               </motion.div>
 
               <motion.p variants={fadeInUp} className="text-center text-sm text-ink-soft">
-                Đã có tài khoản?{' '}
+                {t('auth.haveAccount')}{' '}
                 <Link to="/dang-nhap" className="font-semibold text-jade-700 hover:underline">
-                  Đăng nhập
+                  {t('auth.loginNow')}
                 </Link>
               </motion.p>
             </form>

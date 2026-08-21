@@ -13,15 +13,10 @@ import {
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { customerChatApi } from '../api/chat';
-
-const QUICK_PROMPTS = [
-  { id: 'menu', label: '🍽️ Tư vấn món ăn', text: 'Gợi ý cho mình các món ăn ngon bán chạy tại nhà hàng' },
-  { id: 'reserve', label: '📅 Đặt bàn ngay', text: 'Tôi muốn đặt bàn tại nhà hàng, hãy hướng dẫn tôi' },
-  { id: 'promotions', label: '🏷️ Khuyến mãi', text: 'Hôm nay nhà hàng đang có những chương trình ưu đãi nào?' },
-  { id: 'staff', label: '🎧 Gặp nhân viên', text: 'Gặp nhân viên tư vấn', isEscalate: true },
-];
+import { useLanguage } from '../context/LanguageContext';
 
 export default function ChatbotWidget() {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [chatMode, setChatMode] = useState('ai'); // 'ai' | 'waiting_staff' | 'staff'
@@ -30,7 +25,7 @@ export default function ChatbotWidget() {
     {
       id: 'welcome',
       role: 'model',
-      text: '👋 **Xin chào! Em là AI Assistant của Dola Restaurant.**\n\nEm có thể giúp Anh/Chị:\n- 🍽️ **Tư vấn thực đơn & gợi ý món ăn**\n- 📅 **Đặt bàn tự động nhanh chóng**\n- 🏷️ **Xem thông tin khuyến mãi mới nhất**\n- 🎧 **Kết nối với Nhân viên tư vấn trực tiếp**\n\nAnh/Chị cần hỗ trợ thông tin gì ạ?',
+      text: t('chatbot.welcome'),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -38,6 +33,28 @@ export default function ChatbotWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
+
+  // Update welcome message when language changes if only welcome is in history
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length === 1 && String(prev[0].id).startsWith('welcome')) {
+        return [
+          {
+            ...prev[0],
+            text: t('chatbot.welcome'),
+          },
+        ];
+      }
+      return prev;
+    });
+  }, [t]);
+
+  const quickPrompts = [
+    { id: 'menu', label: t('chatbot.quickPrompts.menu.label'), text: t('chatbot.quickPrompts.menu.text') },
+    { id: 'reserve', label: t('chatbot.quickPrompts.reserve.label'), text: t('chatbot.quickPrompts.reserve.text') },
+    { id: 'promotions', label: t('chatbot.quickPrompts.promotions.label'), text: t('chatbot.quickPrompts.promotions.text') },
+    { id: 'staff', label: t('chatbot.quickPrompts.staff.label'), text: t('chatbot.quickPrompts.staff.text'), isEscalate: true },
+  ];
 
   // Khởi tạo phiên chat & kết nối socket
   useEffect(() => {
@@ -49,7 +66,6 @@ export default function ChatbotWidget() {
           try {
             await customerChatApi.getMessages(activeSessionId);
           } catch {
-            // Phiên cũ đã không tồn tại hoặc bị lỗi -> xóa token cũ
             localStorage.removeItem('dola_chat_session_id');
             activeSessionId = null;
           }
@@ -62,7 +78,6 @@ export default function ChatbotWidget() {
         }
         setSessionId(activeSessionId);
 
-        // Khởi tạo Socket.io client kết nối backend namespace /chat
         const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         const socket = io(`${backendUrl}/chat`, {
           transports: ['websocket', 'polling'],
@@ -73,7 +88,6 @@ export default function ChatbotWidget() {
           socket.emit('customer:join', { sessionId: Number(activeSessionId) });
         });
 
-        // Nhận tin nhắn mới gửi từ phía Staff hoặc Server broadcast
         socket.on('newMessage', (msg) => {
           if (msg.senderType === 'staff') {
             setMessages((prev) => {
@@ -93,13 +107,13 @@ export default function ChatbotWidget() {
 
         socket.on('sessionAssigned', (data) => {
           setChatMode('staff');
-          setStaffName(data.staffName || 'Nhân viên');
+          setStaffName(data.staffName || 'Staff');
           setMessages((prev) => [
             ...prev,
             {
               id: 'assigned-' + Date.now(),
               role: 'system',
-              text: `✅ **${data.staffName || 'Nhân viên tư vấn'}** đã tham gia hỗ trợ bạn!`,
+              text: `✅ **${data.staffName || 'Staff'}** ${t('chatbot.staffJoined', { name: data.staffName || '' })}`,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
           ]);
@@ -115,7 +129,7 @@ export default function ChatbotWidget() {
             {
               id: 'closed-' + Date.now(),
               role: 'system',
-              text: '🔒 **Phiên tư vấn trực tiếp với nhân viên đã kết thúc.** Đã tự động làm mới phiên chat cho cuộc trò chuyện tiếp theo!',
+              text: '🔒 Phiên tư vấn đã kết thúc.',
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
           ]);
@@ -157,7 +171,6 @@ export default function ChatbotWidget() {
       try {
         await customerChatApi.escalate(targetSessionId, 'Khách yêu cầu hỗ trợ qua Chatbot');
       } catch (err) {
-        // Nếu phiên cũ đã đóng (400 Bad Request), tự tạo phiên mới và escalate phiên mới
         if (err.response?.status === 400 || err.response?.status === 404) {
           const freshSession = await customerChatApi.createSession();
           targetSessionId = freshSession.id;
@@ -180,13 +193,12 @@ export default function ChatbotWidget() {
         {
           id: 'escalate-' + Date.now(),
           role: 'system',
-          text: '⏳ **Đã gửi yêu cầu gặp nhân viên tư vấn.** Vui lòng chờ nhân viên tiếp nhận trong giây lát...',
+          text: `⏳ **${t('chatbot.connectingStaff')}**`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
     } catch (err) {
       console.error('Lỗi escalate:', err);
-      alert('Không thể kết nối với nhân viên lúc này. Vui lòng liên hệ Hotline 1900 6750.');
     } finally {
       setIsLoading(false);
     }
@@ -232,7 +244,6 @@ export default function ChatbotWidget() {
 
       const res = await customerChatApi.sendMessage(currentSessionId || sessionId, queryText, historyPayload);
 
-      // Nếu phiên đang chuyển giao sang nhân viên -> không cần bot trả lời lại
       if (res.handedOffToStaff) {
         if (chatMode === 'ai') setChatMode('waiting_staff');
         return;
@@ -249,15 +260,6 @@ export default function ChatbotWidget() {
       }
     } catch (err) {
       console.error('Lỗi gửi tin nhắn:', err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: 'model',
-          text: '❌ **Hệ thống gián đoạn tạm thời.**\nAnh/Chị vui lòng liên hệ Hotline **1900 6750** để được nhân viên hỗ trợ trực tiếp ạ!',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
     } finally {
       setIsLoading(false);
     }
@@ -272,7 +274,7 @@ export default function ChatbotWidget() {
       {
         id: 'welcome-' + Date.now(),
         role: 'model',
-        text: '👋 **Lịch sử trò chuyện đã được làm mới.**\nEm có thể giúp gì thêm cho Anh/Chị ạ?',
+        text: t('chatbot.welcome'),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
@@ -314,7 +316,7 @@ export default function ChatbotWidget() {
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsOpen(true)}
           className="relative flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white shadow-xl shadow-orange-500/30 hover:shadow-orange-500/50 transition-all duration-300 group"
-          title="Trò chuyện cùng Dola Restaurant"
+          title="Dola Restaurant Assistant"
         >
           <Sparkles className="w-7 h-7 animate-pulse group-hover:rotate-12 transition-transform" />
           <span className="absolute -top-1 -right-1 flex h-4 w-4">
@@ -350,10 +352,10 @@ export default function ChatbotWidget() {
                 <div>
                   <h3 className="font-bold text-base leading-snug flex items-center gap-1.5">
                     {chatMode === 'staff'
-                      ? staffName || 'Nhân viên tư vấn'
+                      ? staffName || 'Staff'
                       : chatMode === 'waiting_staff'
-                      ? 'Đang kết nối Nhân viên'
-                      : 'Dola AI Assistant'}
+                      ? t('chatbot.connectingStaff')
+                      : t('chatbot.aiMode')}
                     <span className="text-[10px] bg-amber-400/30 text-amber-100 px-1.5 py-0.5 rounded-full border border-amber-300/40">
                       {chatMode === 'staff' ? 'Staff' : chatMode === 'waiting_staff' ? 'Waiting' : 'AI'}
                     </span>
@@ -361,10 +363,10 @@ export default function ChatbotWidget() {
                   <p className="text-xs text-amber-100/90 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                     {chatMode === 'staff'
-                      ? 'Trò chuyện trực tiếp'
+                      ? t('chatbot.staffMode')
                       : chatMode === 'waiting_staff'
-                      ? 'Vui lòng chờ tiếp nhận...'
-                      : 'Tư vấn tự động 24/7'}
+                      ? t('chatbot.connectingStaff')
+                      : '24/7'}
                   </p>
                 </div>
               </div>
@@ -373,24 +375,24 @@ export default function ChatbotWidget() {
                 {chatMode === 'ai' && (
                   <button
                     onClick={handleEscalate}
-                    title="Gặp nhân viên tư vấn"
+                    title={t('chatbot.quickPrompts.staff.label')}
                     className="px-2 py-1 bg-white/10 hover:bg-white/20 text-xs text-white rounded-lg transition flex items-center gap-1"
                   >
                     <Headphones className="w-3.5 h-3.5" />
-                    Gặp NV
+                    Staff
                   </button>
                 )}
 
                 <button
                   onClick={handleClearHistory}
-                  title="Làm mới trò chuyện"
+                  title="Refresh"
                   className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setIsOpen(false)}
-                  title="Đóng cửa sổ"
+                  title="Close"
                   className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition"
                 >
                   <X className="w-5 h-5" />
@@ -400,7 +402,7 @@ export default function ChatbotWidget() {
 
             {/* Quick Action Chips */}
             <div className="bg-amber-50/60 dark:bg-zinc-800/50 border-b border-amber-100 dark:border-zinc-800 p-2 overflow-x-auto flex space-x-2 scrollbar-none">
-              {QUICK_PROMPTS.map((prompt) => (
+              {quickPrompts.map((prompt) => (
                 <button
                   key={prompt.id}
                   onClick={() => {
@@ -464,7 +466,7 @@ export default function ChatbotWidget() {
                             : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200/80 dark:border-zinc-700/80 rounded-tl-none'
                         }`}
                       >
-                        {isStaffMsg && <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 block mb-1">🎧 Nhân viên tư vấn</span>}
+                        {isStaffMsg && <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 block mb-1">🎧 Staff</span>}
                         {renderFormattedText(msg.text)}
                       </div>
                       <span className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 px-1">
@@ -509,13 +511,7 @@ export default function ChatbotWidget() {
                   type="text"
                   value={inputMsg}
                   onChange={(e) => setInputMsg(e.target.value)}
-                  placeholder={
-                    chatMode === 'staff'
-                      ? 'Nhắn cho nhân viên hỗ trợ...'
-                      : chatMode === 'waiting_staff'
-                      ? 'Gửi thêm thông tin cho nhân viên...'
-                      : 'Nhập câu hỏi hoặc yêu cầu đặt bàn...'
-                  }
+                  placeholder={t('chatbot.inputPlaceholder')}
                   disabled={isLoading}
                   className="w-full pl-4 pr-12 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 border border-transparent dark:border-zinc-700 placeholder:text-zinc-400 transition"
                 />
@@ -530,8 +526,8 @@ export default function ChatbotWidget() {
               <div className="text-center mt-1.5">
                 <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
                   {chatMode === 'staff'
-                    ? 'Đang trò chuyện trực tiếp với Nhân viên'
-                    : 'Powered by Google AI Studio (AI) • Dola Restaurant'}
+                    ? t('chatbot.staffMode')
+                    : 'Powered by Dola AI Assistant'}
                 </span>
               </div>
             </form>

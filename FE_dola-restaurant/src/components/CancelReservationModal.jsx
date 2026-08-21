@@ -1,20 +1,22 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, X, Calendar, Clock, Users, Send } from 'lucide-react'
-
-const QUICK_REASONS = [
-  'Bận việc đột xuất không thể đến',
-  'Thay đổi lịch trình công tác / di chuyển',
-  'Muốn thay đổi ngày / giờ đặt bàn khác',
-  'Thay đổi số lượng người tham gia',
-  'Lý do cá nhân khác',
-]
+import { useLanguage } from '../context/LanguageContext'
 
 export default function CancelReservationModal({ isOpen, onClose, onConfirm, reservation, loading }) {
+  const { t } = useLanguage()
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
 
   if (!isOpen || !reservation) return null
+
+  const quickReasons = t('cancelModal.quickReasons') || [
+    'Bận việc đột xuất không thể đến',
+    'Thay đổi lịch trình công tác / di chuyển',
+    'Muốn thay đổi ngày / giờ đặt bàn khác',
+    'Thay đổi số lượng người tham gia',
+    'Lý do cá nhân khác',
+  ]
 
   const handleSelectQuickReason = (r) => {
     setReason(r)
@@ -24,7 +26,7 @@ export default function CancelReservationModal({ isOpen, onClose, onConfirm, res
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!reason.trim()) {
-      setError('Vui lòng chọn hoặc nhập lý do hủy đặt bàn!')
+      setError(t('cancelModal.errorRequired'))
       return
     }
     setError('')
@@ -66,8 +68,10 @@ export default function CancelReservationModal({ isOpen, onClose, onConfirm, res
               <AlertTriangle className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="font-display text-xl font-bold text-jade-700">Hủy Đơn Đặt Bàn #{reservation.id}</h3>
-              <p className="text-xs text-ink-soft">Vui lòng cung cấp lý do hủy để nhà hàng cải thiện dịch vụ</p>
+              <h3 className="font-display text-xl font-bold text-jade-700">
+                {t('cancelModal.title', { id: reservation.id })}
+              </h3>
+              <p className="text-xs text-ink-soft">{t('cancelModal.subtitle')}</p>
             </div>
           </div>
 
@@ -83,7 +87,7 @@ export default function CancelReservationModal({ isOpen, onClose, onConfirm, res
             </div>
             <div className="flex items-center gap-1.5 font-medium">
               <Users className="h-4 w-4 text-jade-700" />
-              <span>{reservation.guests} khách</span>
+              <span>{reservation.guests} {t('account.guests')}</span>
             </div>
           </div>
 
@@ -91,10 +95,10 @@ export default function CancelReservationModal({ isOpen, onClose, onConfirm, res
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
             <div>
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ink-soft">
-                Chọn nhanh lý do hủy:
+                {t('cancelModal.quickReasonsLabel')}
               </label>
               <div className="flex flex-wrap gap-2">
-                {QUICK_REASONS.map((r, idx) => (
+                {Array.isArray(quickReasons) && quickReasons.map((r, idx) => (
                   <button
                     key={idx}
                     type="button"
@@ -112,9 +116,6 @@ export default function CancelReservationModal({ isOpen, onClose, onConfirm, res
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-soft">
-                Chi tiết lý do hủy <span className="text-lacquer">*</span>
-              </label>
               <textarea
                 rows={3}
                 value={reason}
@@ -122,15 +123,10 @@ export default function CancelReservationModal({ isOpen, onClose, onConfirm, res
                   setReason(e.target.value)
                   if (error) setError('')
                 }}
-                placeholder="Nhập chi tiết lý do bạn muốn hủy đơn đặt bàn..."
+                placeholder={t('cancelModal.reasonPlaceholder')}
                 className="w-full rounded-xl border border-jade-700/20 bg-ivory p-3 text-sm outline-none transition-all focus:border-lacquer focus:ring-1 focus:ring-lacquer/30"
               />
               {error && <p className="mt-1 text-xs font-medium text-lacquer">{error}</p>}
-            </div>
-
-            {/* Note alert */}
-            <div className="rounded-lg bg-gold/10 p-3 text-xs text-gold-dark border border-gold/20">
-              ⚡ <strong>Lưu ý:</strong> Đơn đặt bàn không thể hủy trực tuyến trong vòng <strong>2 tiếng</strong> trước giờ hẹn. Vui lòng liên hệ Hotline <strong>1900 6750</strong> để được hỗ trợ.
             </div>
 
             {/* Buttons */}
@@ -141,7 +137,7 @@ export default function CancelReservationModal({ isOpen, onClose, onConfirm, res
                 disabled={loading}
                 className="rounded-full px-5 py-2.5 text-xs font-semibold text-ink-soft transition-colors hover:bg-black/5"
               >
-                Hủy bỏ
+                {t('cancelModal.keepBtn')}
               </button>
 
               <motion.button
@@ -152,7 +148,7 @@ export default function CancelReservationModal({ isOpen, onClose, onConfirm, res
                 className="flex items-center gap-2 rounded-full bg-lacquer px-6 py-2.5 text-xs font-semibold text-ivory shadow-md transition-all hover:bg-lacquer/90 disabled:opacity-50"
               >
                 <Send className="h-3.5 w-3.5" />
-                <span>{loading ? 'Đang xử lý...' : 'Xác nhận Hủy Đơn'}</span>
+                <span>{loading ? t('cancelModal.cancelling') : t('cancelModal.confirmBtn')}</span>
               </motion.button>
             </div>
           </form>

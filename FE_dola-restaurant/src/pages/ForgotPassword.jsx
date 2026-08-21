@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { forgotPassword } from '../api/auth'
+import { useLanguage } from '../context/LanguageContext'
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 24 },
@@ -13,9 +14,8 @@ const staggerContainer = {
   visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
 }
 
-// Chỉ báo 3 bước dùng chung cho luồng quên mật khẩu (Forgot -> Verify -> Reset)
-function StepIndicator({ step }) {
-  const steps = ['Gửi mã', 'Xác thực', 'Đổi mật khẩu']
+function StepIndicator({ step, t }) {
+  const steps = [t('auth.stepSendCode'), t('auth.stepVerify'), t('auth.stepReset')]
   return (
     <div className="mx-auto mt-6 flex max-w-xs items-center justify-center gap-2">
       {steps.map((label, i) => {
@@ -46,6 +46,7 @@ function StepIndicator({ step }) {
 }
 
 export default function ForgotPassword() {
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
@@ -63,7 +64,7 @@ export default function ForgotPassword() {
       setMessage(data.message)
       navigate('/xac-thuc-ma', { state: { email } })
     } catch (err) {
-      const messageText = err?.response?.data?.message || 'Không thể gửi mã khôi phục, vui lòng thử lại'
+      const messageText = err?.response?.data?.message || t('common.error')
       setError(messageText)
     } finally {
       setLoading(false)
@@ -85,17 +86,19 @@ export default function ForgotPassword() {
         className="relative z-10 mx-auto w-full max-w-md px-6"
       >
         <motion.div variants={fadeInUp} className="text-center">
-          <span className="font-script text-lg italic tracking-widest text-gold-dark">Khôi phục tài khoản</span>
-          <h1 className="mt-2 font-display text-3xl font-semibold text-jade-700">Quên mật khẩu</h1>
+          <span className="font-script text-lg italic tracking-widest text-gold-dark">
+            {t('auth.forgotSubtitle')}
+          </span>
+          <h1 className="mt-2 font-display text-3xl font-semibold text-jade-700">
+            {t('auth.forgotTitle')}
+          </h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-            Nhập email đã đăng ký.
-            <br />
-            Hệ thống sẽ gửi mã xác thực cho bạn.
+            {t('auth.forgotDesc')}
           </p>
         </motion.div>
 
         <motion.div variants={fadeInUp}>
-          <StepIndicator step={1} />
+          <StepIndicator step={1} t={t} />
         </motion.div>
 
         <motion.div
@@ -134,14 +137,14 @@ export default function ForgotPassword() {
               )}
             </AnimatePresence>
             <div>
-              <label className="text-xs font-medium text-ink-soft">Email</label>
+              <label className="text-xs font-medium text-ink-soft">{t('auth.emailOrPhone')}</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-jade-700/15 bg-ivory px-4 py-2.5 text-sm outline-none focus:border-gold"
-                placeholder="ban@email.com"
+                placeholder={t('auth.emailPlaceholder')}
               />
             </div>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
@@ -150,12 +153,12 @@ export default function ForgotPassword() {
                 disabled={loading}
                 className="w-full rounded-full bg-gradient-to-r from-gold-dark to-gold px-8 py-3 text-[15px] font-semibold text-jade-900 shadow-gold transition-transform disabled:opacity-60"
               >
-                {loading ? 'Đang gửi...' : 'Gửi mã khôi phục'}
+                {loading ? t('auth.sendingCode') : t('auth.sendCodeBtn')}
               </button>
             </motion.div>
             <p className="text-center text-sm text-ink-soft">
               <Link to="/dang-nhap" className="font-semibold text-jade-700 hover:underline">
-                ← Về trang đăng nhập
+                ← {t('auth.backToLogin')}
               </Link>
             </p>
           </form>
