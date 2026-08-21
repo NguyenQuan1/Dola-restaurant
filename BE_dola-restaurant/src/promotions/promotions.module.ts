@@ -7,13 +7,14 @@ import { PromotionsService } from './promotions.service';
 import { PromotionsController } from './promotions.controller';
 import { PromotionsPublicController } from './public-promotions.controller';
 import { PromotionsCron } from './promotions.cron';
+import { MailModule } from '../mail/mail.module';
 
 // Đăng ký thêm User, Role (đã có ở AuthModule) vì PromotionsService cần
 // query trực tiếp danh sách user role 'customer' để gửi mail — không đi qua
 // AuthService vì AuthService chỉ export các nghiệp vụ auth, không có sẵn hàm
 // lọc theo role phù hợp cho việc gửi mail hàng loạt.
 @Module({
-  imports: [TypeOrmModule.forFeature([Promotion, User, Role])],
+  imports: [TypeOrmModule.forFeature([Promotion, User, Role]), MailModule],
   // PromotionsController: yêu cầu đăng nhập (admin/staff) — CRUD + đổi trạng thái.
   // PromotionsPublicController: không guard — trang user chỉ đọc khuyến mãi 'ongoing'.
   controllers: [PromotionsController, PromotionsPublicController],

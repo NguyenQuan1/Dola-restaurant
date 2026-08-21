@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, LessThan, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { MailService } from '../mail/mail.service';
 import { Promotion, PromotionStatus } from './entities/promotion.entity';
 import { buildPromotionMailHtml, buildPromotionMailText } from './templates/promotion-mail.template';
 import { User } from '../auth/entities/user.entity';
@@ -41,17 +41,13 @@ const MAIL_CHUNK_SIZE = 50;
 export class PromotionsService {
   private readonly logger = new Logger(PromotionsService.name);
 
-  // Transporter được tạo 1 lần và tái sử dụng (pool: true) thay vì tạo mới
-  // mỗi lần gửi mail — tránh tốn thời gian handshake TLS lặp lại khi có
-  // nhiều khuyến mãi chuyển "ongoing" liên tiếp.
-  private transporter: nodemailer.Transporter | null = null;
-
   constructor(
     @InjectRepository(Promotion)
     private readonly promotionRepo: Repository<Promotion>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   async findAll(query: FindAllPromotionsQuery = {}) {
@@ -398,49 +394,11 @@ export class PromotionsService {
     return customers.map((c) => c.email);
   }
 
-  // Lấy (hoặc khởi tạo) transporter dùng chung cho mọi lần gửi mail khuyến
-  // mãi. Ném lỗi rõ ràng ngay lập tức nếu thiếu MAIL_USER/MAIL_PASS thay vì
-  // âm thầm dùng giá trị placeholder rồi fail khó hiểu ở tầng SMTP.
-  private getTransporter(): nodemailer.Transporter {
-    if (this.transporter) return this.transporter;
-
-    const user = this.configService.get<string>('MAIL_USER')?.trim();
-    const rawPass = this.configService.get<string>('MAIL_PASS')?.trim();
-    const pass = rawPass ? rawPass.replace(/\s+/g, '') : undefined;
-    const host = this.configService.get<string>('MAIL_HOST') || 'smtp.resend.com';
-    const port = Number(this.configService.get<string>('MAIL_PORT') || 465);
-
-    if (!user || !pass) {
-      throw new Error('Thiếu cấu hình gửi mail: vui lòng đặt MAIL_USER và MAIL_PASS trong biến môi trường');
-    }
-
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
-
-    return this.transporter;
-  }
-
   // Gửi mail theo từng lô (bcc), KHÔNG để 1 lô lỗi làm dừng toàn bộ các lô
   // còn lại — trả về số lô thành công/thất bại để notifyCustomers quyết
   // định có set notifiedAt hay không.
   private async sendPromotionMail(promotion: Promotion, emails: string[]): Promise<SendMailResult> {
-    const transporter = this.getTransporter();
-
-    const from = this.configService.get<string>('MAIL_FROM') || 'Dola Restaurant <noreply@dola.local>';
-
-    // "to" PHẢI là địa chỉ email thật để gửi được — không dùng lại `from`,
-    // vì MAIL_FROM có thể là domain hiển thị (vd noreply@dola.local) không
-    // tồn tại thật trên Internet, khiến toàn bộ mail (kể cả phần bcc cho
-    // khách hàng) bị Gmail trả về "Không tìm thấy địa chỉ" (bounce).
-    // Dùng chính tài khoản Gmail đang đăng nhập (MAIL_USER) làm "to".
-    const to = this.configService.get<string>('MAIL_USER') || from;
-
-    // Link cho nút "Đặt bàn ngay" trong email — đọc từ .env (FRONTEND_URL).
-    // Khi deploy thật chỉ cần thêm/sửa biến này, không cần sửa code.
+    // Link cho nút "Đặt bàn ngay" trong email
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
     const ctaUrl = `${frontendUrl.replace(/\/$/, '')}/promotions`;
 
@@ -450,18 +408,15 @@ export class PromotionsService {
     for (let i = 0; i < emails.length; i += MAIL_CHUNK_SIZE) {
       const chunk = emails.slice(i, i + MAIL_CHUNK_SIZE);
       try {
-        await transporter.sendMail({
-          from,
-          to,
+        await this.mailService.send({
+          to: chunk[0],          // Resend yêu cầu "to" hợp lệ; gửi lô qua bcc
           bcc: chunk,
           subject: `🎉 Khuyến mãi mới: ${promotion.title}`,
-          text: buildPromotionMailText(promotion), // fallback cho client không đọc được HTML
+          text: buildPromotionMailText(promotion),
           html: buildPromotionMailHtml(promotion, ctaUrl),
         });
         sentChunks++;
       } catch (error: any) {
-        // Lô này lỗi (vd mất mạng tạm thời) không được làm dừng các lô sau —
-        // khách hàng ở các lô khác vẫn nên nhận được mail bình thường.
         failedChunks++;
         this.logger.warn(
           `Lô ${Math.floor(i / MAIL_CHUNK_SIZE) + 1} (${chunk.length} khách hàng) gửi mail khuyến mãi #${promotion.id} thất bại: ${error?.message || error}`,

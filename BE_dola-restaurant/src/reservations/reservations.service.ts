@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, ILike, In, IsNull, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { MailService } from '../mail/mail.service';
 import { Reservation, ReservationCancelledBy, ReservationStatus } from './entities/reservation.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Table } from '../tables/entities/table.entity';
@@ -48,10 +48,6 @@ const CANCELLABLE_STATUSES: ReservationStatus[] = ['pending', 'confirmed', 'seat
 export class ReservationsService {
   private readonly logger = new Logger(ReservationsService.name);
 
-  // Transporter tái sử dụng, tương tự PromotionsService — tránh handshake
-  // TLS lặp lại mỗi lần gửi mail xác nhận/huỷ.
-  private transporter: nodemailer.Transporter | null = null;
-
   constructor(
     @InjectRepository(Reservation)
     private readonly reservationRepo: Repository<Reservation>,
@@ -60,6 +56,7 @@ export class ReservationsService {
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) { }
 
   async findAll(query: FindAllReservationsQuery = {}) {
@@ -433,8 +430,6 @@ export class ReservationsService {
     }
 
     try {
-      const transporter = this.getTransporter();
-      const from = this.configService.get<string>('MAIL_FROM') || 'Dola Restaurant <noreply@dola.local>';
       const data = this.toMailData(reservation);
 
       let subject = '';
@@ -455,44 +450,16 @@ export class ReservationsService {
         html = buildReservationReminderMailHtml(data);
       }
 
-      await transporter.sendMail({
-        from,
+      await this.mailService.send({
         to: reservation.email,
         subject,
         text,
         html,
       });
     } catch (error: any) {
-      // Lỗi cấu hình SMTP hoặc lỗi gửi mail không được chặn luồng nghiệp vụ
-      // chính (đổi trạng thái/huỷ đơn vẫn phải thành công) — chỉ log lại.
       this.logger.warn(
         `Gửi mail ${type} cho đặt bàn #${reservation.id} thất bại: ${error?.message || error}`,
       );
     }
-  }
-
-  // Lấy (hoặc khởi tạo) transporter dùng chung — cùng cấu hình env với
-  // PromotionsService (MAIL_USER/MAIL_PASS/MAIL_HOST/MAIL_PORT).
-  private getTransporter(): nodemailer.Transporter {
-    if (this.transporter) return this.transporter;
-
-    const user = this.configService.get<string>('MAIL_USER')?.trim();
-    const rawPass = this.configService.get<string>('MAIL_PASS')?.trim();
-    const pass = rawPass ? rawPass.replace(/\s+/g, '') : undefined;
-    const host = this.configService.get<string>('MAIL_HOST') || 'smtp.resend.com';
-    const port = Number(this.configService.get<string>('MAIL_PORT') || 465);
-
-    if (!user || !pass) {
-      throw new Error('Thiếu cấu hình gửi mail: vui lòng đặt MAIL_USER và MAIL_PASS trong biến môi trường');
-    }
-
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
-
-    return this.transporter;
   }
 }

@@ -9,9 +9,10 @@ import { ReservationsController } from './reservations.controller';
 import { ReservationsPublicController } from './public-reservations.controller';
 import { UserReservationsController } from './user-reservations.controller';
 import { ReservationsCron } from './reservations.cron';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Reservation, Table, Order]), JwtModule],
+  imports: [TypeOrmModule.forFeature([Reservation, Table, Order]), JwtModule, MailModule],
   controllers: [
     ReservationsController,
     ReservationsPublicController,

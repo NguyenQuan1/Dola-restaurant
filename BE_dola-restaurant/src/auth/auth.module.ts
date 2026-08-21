@@ -9,11 +9,13 @@ import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
 import { Order } from '../orders/entities/order.entity';
 import { ReservationsModule } from '../reservations/reservations.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Role, Order]),
     ReservationsModule,
+    MailModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

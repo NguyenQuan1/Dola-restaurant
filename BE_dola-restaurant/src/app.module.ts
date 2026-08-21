@@ -42,6 +42,7 @@ import { Order } from './orders/entities/order.entity';
 import { OrderItem } from './orders/entities/order-item.entity';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
+import { MailModule } from './mail/mail.module';
 
 
 const migrationsPath = path.join(__dirname, 'migrations', '*{.ts,.js}');
@@ -82,6 +83,7 @@ const migrationsPath = path.join(__dirname, 'migrations', '*{.ts,.js}');
     TablesModule,
     OrdersModule,
     PaymentsModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [

@@ -9,12 +9,12 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
-import * as nodemailer from 'nodemailer';
 import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { ReservationsService } from '../reservations/reservations.service';
 import { Order } from '../orders/entities/order.entity';
+import { MailService } from '../mail/mail.service';
 
 export interface FindAllUsersQuery {
   search?: string;
@@ -28,7 +28,6 @@ export interface FindAllUsersQuery {
 export class AuthService {
   private readonly codeStore = new Map<string, { code: string; expiresAt: number }>();
   private readonly logger = new Logger(AuthService.name);
-  private transporter: nodemailer.Transporter | null = null;
 
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
@@ -37,6 +36,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly reservationsService: ReservationsService,
+    private readonly mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -454,39 +454,12 @@ export class AuthService {
     };
   }
 
-  private getTransporter(): nodemailer.Transporter {
-    if (this.transporter) return this.transporter;
-
-    const user = this.configService.get<string>('MAIL_USER')?.trim();
-    const rawPass = this.configService.get<string>('MAIL_PASS')?.trim();
-    const pass = rawPass ? rawPass.replace(/\s+/g, '') : undefined;
-    const host = this.configService.get<string>('MAIL_HOST') || 'smtp.resend.com';
-    const port = Number(this.configService.get<string>('MAIL_PORT') || 465);
-
-    if (!user || !pass) {
-      throw new Error('Thiếu cấu hình gửi mail: vui lòng đặt MAIL_USER và MAIL_PASS trong biến môi trường');
-    }
-
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
-
-    return this.transporter;
-  }
-
   private async sendMail(to: string, code: string) {
-    const transporter = this.getTransporter();
-    const user = this.configService.get<string>('MAIL_USER');
-    const from = this.configService.get<string>('MAIL_FROM') || `Dola Restaurant <${user}>`;
-
-    await transporter.sendMail({
-      from,
+    await this.mailService.send({
       to,
       subject: 'Mã đặt lại mật khẩu',
       text: `Mã đặt lại của bạn là ${code}`,
+      html: `<p>Mã đặt lại mật khẩu của bạn là: <strong>${code}</strong></p><p>Mã có hiệu lực trong 10 phút.</p>`,
     });
   }
 }
